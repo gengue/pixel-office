@@ -3,7 +3,7 @@ import { join, extname } from 'node:path'
 import { getRTCConfig } from './rtc-config'
 import { normalizeAppearance } from './public/avatars.js'
 import { REACTIONS } from './public/reactions.js'
-import { ROOMS, roomAt } from './public/rooms.js'
+import { ROOMS, roomAt, fullRoomAt } from './public/rooms.js'
 import { canViewScreen, voiceVolume, LINK } from './public/voice.js'
 
 const PORT = Number(process.env.PORT ?? 3000)
@@ -42,6 +42,23 @@ function spawnPoint(): { x: number; y: number } {
 
 const WORLD_W = 2400
 const WORLD_H = 1600
+
+function movePlayer(ws: any, x: unknown, y: unknown) {
+  const me = ws.data.player
+  const next = {
+    ...me,
+    x: typeof x === 'number' && Number.isFinite(x) ? Math.max(24, Math.min(WORLD_W - 24, x)) : me.x,
+    y: typeof y === 'number' && Number.isFinite(y) ? Math.max(40, Math.min(WORLD_H - 24, y)) : me.y,
+  }
+  const full = fullRoomAt(next, roster().filter((p) => p.name))
+  if (full) {
+    ws.send(JSON.stringify({ t: 'move-blocked', x: me.x, y: me.y, sitting: !!me.sitting, room: full.label }))
+    return false
+  }
+  me.x = next.x
+  me.y = next.y
+  return true
+}
 
 function broadcast(msg: unknown, except?: string) {
   const raw = JSON.stringify(msg)
@@ -134,16 +151,14 @@ const server = Bun.serve<SockData>({
         me.country = /^[A-Z]{2}$/.test(cc) ? cc : ''
         me.hand = false
         me.sitting = false
-        if (typeof msg.x === 'number') me.x = msg.x
-        if (typeof msg.y === 'number') me.y = msg.y
+        movePlayer(ws, msg.x, msg.y)
         ws.send(JSON.stringify({ t: 'welcome', id: ws.data.id, roster: roster() }))
         broadcast({ t: 'peer-join', player: me }, ws.data.id)
         updateShares()
         return
       }
       if (msg.t === 'move') {
-        me.x = Math.max(24, Math.min(WORLD_W - 24, Number(msg.x) || me.x))
-        me.y = Math.max(40, Math.min(WORLD_H - 24, Number(msg.y) || me.y))
+        if (!me.name || !movePlayer(ws, msg.x, msg.y)) return
         broadcast({ t: 'peer-move', id: ws.data.id, x: me.x, y: me.y }, ws.data.id)
         updateShares()
         return
@@ -154,9 +169,8 @@ const server = Bun.serve<SockData>({
         return
       }
       if (msg.t === 'sit') {
+        if (!me.name || !movePlayer(ws, msg.x, msg.y)) return
         me.sitting = !!msg.sitting
-        if (typeof msg.x === 'number') me.x = Math.max(24, Math.min(WORLD_W - 24, msg.x))
-        if (typeof msg.y === 'number') me.y = Math.max(40, Math.min(WORLD_H - 24, msg.y))
         broadcast({ t: 'peer-sit', id: ws.data.id, sitting: me.sitting, x: me.x, y: me.y })
         updateShares()
         return

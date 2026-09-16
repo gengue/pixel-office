@@ -3,7 +3,7 @@ import { createOfficeArt } from './office-art.js'
 import { createSeats, findSeat } from './seating.js'
 import { addRemoteIce, setRemoteDescription } from './rtc.js'
 import { LINK, voiceVolume } from './voice.js'
-import { ROOMS as floors } from './rooms.js'
+import { ROOMS as floors, fullRoomAt } from './rooms.js'
 import { REACTIONS } from './reactions.js'
 import { setupScreenShare } from './screen-share.js'
 
@@ -28,6 +28,13 @@ const walls = [
   [24, 24, 1756, 100],
   [1780, 60, 580, 20], [1780, 60, 20, 220], [1780, 380, 20, 180],
   [2340, 60, 20, 500], [1780, 540, 220, 20], [2100, 540, 260, 20],
+  // Restroom stalls, with a shared wash area and an east entrance.
+  [40, 660, 580, 40], [40, 660, 20, 280], [600, 660, 20, 130], [600, 860, 20, 80], [40, 920, 580, 20],
+  [230, 700, 12, 130], [410, 700, 12, 130],
+  [60, 830, 60, 12], [200, 830, 42, 12], [242, 830, 58, 12], [380, 830, 42, 12],
+  // Four-person huddle room; the west doorway stays clear.
+  [1880, 630, 400, 20], [1880, 630, 20, 130], [1880, 860, 20, 60],
+  [2260, 630, 20, 290], [1880, 900, 400, 20],
   [700, 940, 200, 20], [1000, 940, 400, 20], [1500, 940, 200, 20],
 ]
 // furn: [type, x, y, w, h, extra]
@@ -61,13 +68,16 @@ const furn = [
   ['chair', 2020, 1212, 28, 28, 'diningChair'], ['chair', 2100, 1212, 28, 28, 'diningChair'],
   ['chair', 2020, 1378, 28, 28, 'diningChair'], ['chair', 2100, 1378, 28, 28, 'diningChair'],
   ['plant', 2280, 1480, 24, 20, 'flowers'], ['water', 2210, 1090, 38, 34],
-  ['rug', 820, 1090, 650, 390, '#b6c6ba'],
-  ['sofaH', 1000, 1160, 180, 66, 'tealSofa'],
-  ['ctable', 1020, 1280, 140, 66],
-  ['sofaH', 1000, 1420, 180, 66],
-  ['plant', 860, 1180, 28, 24, 'palm'], ['plant', 1380, 1190, 24, 20, 'fern'],
-  ['plant', 1390, 1440, 24, 20, 'flowers'],
-  ['shelf', 830, 1470, 130, 26],
+  ['sofaH', 880, 1150, 180, 54, 'gardenBench'],
+  ['ctable', 1160, 1230, 150, 70, 'parasol'],
+  ['sofaH', 880, 1390, 180, 54, 'gardenBench'], ['sofaH', 1290, 1390, 180, 54, 'gardenBench'],
+  ['plant', 790, 1140, 30, 28, 'olive'], ['plant', 1530, 1150, 30, 28, 'olive'],
+  ['planter', 800, 1490, 160, 30, 'herbPlanter'], ['planter', 1370, 1490, 160, 30, 'herbPlanter'],
+  ['plant', 1520, 1390, 24, 20, 'flowers'],
+  ['toilet', 130, 740, 48, 50], ['toilet', 310, 740, 48, 50], ['vanity', 465, 735, 100, 50],
+  ['ctableBig', 2000, 780, 170, 70],
+  ['chair', 2000, 735], ['chair', 2110, 735], ['chair', 2000, 860], ['chair', 2110, 860],
+  ['plant', 2215, 735, 24, 20, 'snake'],
   ['tv', 380, 590, 150, 40], ['sideboard', 80, 610, 180, 36],
   ['plant', 560, 610, 24, 20, 'snake'],
 ]
@@ -75,7 +85,7 @@ for (const [x, y, w, h] of walls) solid(x, y, w, h)
 const seats = createSeats(furn)
 for (const [t, x, y, w, h] of furn) {
   if (t === 'plant') solid(x, y, w ?? 20, h ?? 20)
-  else if (['board', 'shelf', 'fridge', 'tv', 'armchair', 'planter', 'sideboard', 'water'].includes(t)) solid(x, y, w, h)
+  else if (['board', 'shelf', 'fridge', 'tv', 'armchair', 'planter', 'sideboard', 'water', 'toilet', 'vanity'].includes(t)) solid(x, y, w, h)
   else if (t.includes('table') || t === 'desk' || t.startsWith('sofa') || t.startsWith('counter')) {
     solid(x, y, t === 'desk' ? 150 : w, t === 'desk' ? 70 : h)
   }
@@ -326,6 +336,9 @@ function connect() {
         p.tx = m.x
         p.ty = m.y
       }
+    } else if (m.t === 'move-blocked') {
+      Object.assign(me, { x: m.x, y: m.y, tx: null, ty: null, sitting: m.sitting })
+      showRoomFull(m.room)
     } else if (m.t === 'peer-leave') {
       peers.delete(m.id)
       closePC(m.id)
@@ -520,6 +533,17 @@ setInterval(() => {
 }, 1200)
 
 // ---------- sitting ----------
+let roomNoticeTimer
+function showRoomFull(room) {
+  $('roomStatus').textContent = `${room} is full`
+  clearTimeout(roomNoticeTimer)
+  roomNoticeTimer = setTimeout(() => { $('roomStatus').textContent = '' }, 2500)
+}
+function canMoveTo(x, y) {
+  const full = fullRoomAt({ ...me, x, y }, [...peers.values()])
+  if (full) { showRoomFull(full.label); me.tx = me.ty = null }
+  return !full && !hitsSolid(x, y, BODY_R)
+}
 let seatReturn = null
 const nearbySeat = () => findSeat(seats, me, [...peers.values()], (x, y) => hitsSolid(x, y, BODY_R))
 function sendSit() {
@@ -539,6 +563,8 @@ function toggleSit() {
   }
   const best = nearbySeat()
   if (!best) return
+  const full = fullRoomAt({ ...me, x: best.x, y: best.y }, [...peers.values()])
+  if (full) { showRoomFull(full.label); return }
   seatReturn = { x: me.x, y: me.y }
   me.x = best.x
   me.y = best.y
@@ -870,8 +896,17 @@ function drawMini(all) {
     mctx.arc(a.x * s, a.y * s, a.isMe ? 3 : 2, 0, 7)
     mctx.fill()
   }
-  mctx.strokeStyle = '#ffffff88'
-  mctx.lineWidth = 1
+  // A dark outer edge and warm inner edge remain readable on every floor color.
+  mctx.fillStyle = '#142d3c33'
+  mctx.beginPath()
+  mctx.rect(0, 0, mini.width, mini.height)
+  mctx.rect(cam.x * s, cam.y * s, VIEW.w * s, VIEW.h * s)
+  mctx.fill('evenodd')
+  mctx.strokeStyle = '#173b46'
+  mctx.lineWidth = 6
+  mctx.strokeRect(cam.x * s, cam.y * s, VIEW.w * s, VIEW.h * s)
+  mctx.strokeStyle = '#ffe08a'
+  mctx.lineWidth = 3
   mctx.strokeRect(cam.x * s, cam.y * s, VIEW.w * s, VIEW.h * s)
 }
 
@@ -966,8 +1001,8 @@ function tick(now) {
     const oldY = me.y
     // movement (axis-separated vs solids = slides along walls)
     const step = (dx, dy) => {
-      if (dx && !hitsSolid(me.x + dx, me.y, BODY_R)) me.x += dx
-      if (dy && !hitsSolid(me.x, me.y + dy, BODY_R)) me.y += dy
+      if (dx && canMoveTo(me.x + dx, me.y)) me.x += dx
+      if (dy && canMoveTo(me.x, me.y + dy)) me.y += dy
     }
     let vx = 0
     let vy = 0

@@ -45,8 +45,9 @@
   <main>
     <div id="canvasWrap">
       <canvas id="map" width="960" height="600" aria-label="Virtual office. Move with WASD, arrow keys, or click. Press E near a chair or sofa to sit."></canvas>
-      <canvas id="mini" width="190" height="127"></canvas>
+      <canvas id="mini" width="190" height="127" aria-label="Office minimap. The gold outline marks your current view." title="Gold outline: your current view"></canvas>
       <div id="bubbles"></div>
+      <p id="roomStatus" role="status" aria-live="polite"></p>
       <button id="sitBtn" type="button" hidden>E · Sit down</button>
     </div>
     <aside>

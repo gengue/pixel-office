@@ -64,3 +64,10 @@ final result: passed
 - Picker opens immediately above React; 1440, 390 and 320 px layouts fit without horizontal overflow.
 - Microphone and raised-hand state are conveyed by labels and aria-pressed, with distinct styling.
 - Removed the duplicate stop-sharing action and repeated presentation copy; content reserves the measured dock height.
+
+## Map expansion
+
+- Added tiled restrooms with two stalls and a wash area, an outdoor lawn/deck terrace, and a four-seat huddle room.
+- Walkability search confirms every new zone and all 36 seat approaches are reachable from the entrance. Browser checks exercise every seat, safe exit, and occupancy synchronization.
+- Capacity is checked by both the client and server on join/move/sit; the fifth visitor sees a full-room notice and can enter when a place is released.
+- Minimap uses a dark/gold double outline and dims the area outside the current viewport. Desktop and mobile artwork reviewed.

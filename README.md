@@ -22,6 +22,8 @@ Other devices need HTTPS for camera, microphone and screen capture.
   move or press E again to stand.
 - Choose your body, outfit and accessory before joining. Your appearance is saved
   on your device. Your live webcam remains your avatar's face.
+- Explore the restrooms, outdoor terrace and a four-seat huddle room for smaller meetings.
+  The huddle room admits at most four people; a place opens when someone leaves.
 - Walk near someone to talk. Voice fades over 320 world pixels; people inside the
   same marked room hear each other at full volume, regardless of distance.
 - Use the bottom controls to mute, react, raise your hand, share a screen or leave.
@@ -76,7 +78,7 @@ candidates, screen audience enforcement, reaction validation and viewer lifecycl
 - `public/office-art.js`, `avatars.js`, `seating.js`: artwork, bodies and usable seats.
 - `public/rooms.js`, `voice.js`, `reactions.js`: shared room and interaction rules.
 
-The two furniture atlases are original AI-generated assets. The basic renderer
+The three furniture atlases are original AI-generated assets. The basic renderer
 keeps the office usable while images load or if they fail. Reduced-motion settings
 suppress decorative animation.
 

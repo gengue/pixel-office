@@ -149,3 +149,6 @@ body:has(#reactionPicker:popover-open) #reactionFeed { bottom: calc(var(--dock-h
 }
 
 #screenHint:empty { display: none; }
+
+#roomStatus { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); max-width: calc(100% - 24px); margin: 0; padding: 8px 14px; border-radius: 10px; background: #fff2d3; color: #68461d; box-shadow: 0 3px 12px #27392e30; text-align: center; pointer-events: none; }
+#roomStatus:empty { display: none; }
