@@ -23,7 +23,7 @@ test('record player has medium volume nearby, fades with distance and cannot rea
   expect(musicVolume({ x: 670, y: 1450 })).toBe(0)
 })
 
-test('disconnect cancels a play request while YouTube is still loading', async () => {
+for (const action of ['disconnect', 'close player']) test(`${action} cancels a play request while YouTube is still loading`, async () => {
   const original = Object.fromEntries(['document', 'window', 'location'].map((key) => [key, Object.getOwnPropertyDescriptor(globalThis, key)]))
   const nodes = new Map()
   let events, playRequests = 0
@@ -31,7 +31,7 @@ test('disconnect cancels a play request while YouTube is still loading', async (
     document: {
       hidden: false, addEventListener() {},
       getElementById(id) {
-        if (!nodes.has(id)) nodes.set(id, { getClientRects: () => [{}] })
+        if (!nodes.has(id)) nodes.set(id, { getClientRects: () => [{}], focus() {} })
         return nodes.get(id)
       },
     },
@@ -49,7 +49,13 @@ test('disconnect cancels a play request while YouTube is still loading', async (
     for (const [key, value] of Object.entries(globals)) Object.defineProperty(globalThis, key, { configurable: true, value })
     const music = setupMusic(() => ({ x: 474, y: 1370 }))
     const pending = nodes.get('musicPlay').onclick()
-    music.pause()
+    if (action === 'disconnect') music.pause()
+    else {
+      expect(typeof nodes.get('musicClose')?.onclick).toBe('function')
+      nodes.get('musicClose').onclick()
+      expect(nodes.get('musicPanel').hidden).toBe(true)
+      expect(nodes.get('musicOpen').hidden).toBe(false)
+    }
     events.onReady()
     await pending
     expect(playRequests).toBe(0)

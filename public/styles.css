@@ -66,10 +66,11 @@ button:disabled { opacity: 0.6; cursor: wait; }
 .bubble .clamp { display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; max-height: 72px; text-overflow: ellipsis; overflow-wrap: anywhere; }
 .bubble.open .clamp { -webkit-line-clamp: unset; max-height: none; }
 aside { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 12px; display: flex; flex-direction: column; min-height: 0; overflow: auto; }
+aside > * { flex-shrink: 0; }
 aside h2 { margin: 8px 0; font-size: 13px; text-transform: uppercase; letter-spacing: 1px; color: var(--dim); }
 #flagBar { display: flex; flex-wrap: wrap; gap: 4px; font-size: 20px; min-height: 4px; margin-bottom: 6px; }
 #flagBar span { cursor: default; }
-#history { flex: 1; min-height: 80px; overflow: auto; display: flex; flex-direction: column; gap: 8px; }
+#history { flex: 1 0 220px; min-height: 220px; overflow: auto; display: flex; flex-direction: column; gap: 8px; }
 .msg { background: #f4f3eb; border: 1px solid var(--line); border-radius: 10px; padding: 7px 9px; }
 .msg b { color: var(--acc); }
 .msg time { color: var(--dim); font-size: 11px; margin-left: 6px; }
@@ -154,11 +155,19 @@ body:has(#reactionPicker:popover-open) #reactionFeed { bottom: calc(var(--dock-h
 #screenHint:empty { display: none; }
 
 #musicPanel { border-bottom: 1px solid var(--line); padding-bottom: 10px; }
-#musicPanel .row { flex-wrap: wrap; }
+.panelHeading { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.panelHeading h2 { min-width: 0; }
+#musicPanel #musicClose { flex: none; font-size: 20px; line-height: 1; padding: 4px 8px; }
+#musicOpen { font-size: 12px; min-height: 30px; }
+#musicPanel .row { flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+#musicPanel button { padding: 5px 8px; min-height: 30px; font-size: 12px; }
+#musicPanel .hint { margin: 8px 0; }
+#musicStatus:empty { display: none; }
 #musicVideo:has(iframe) { min-height: 200px; }
 #musicVideo iframe { display: block; width: 100%; height: 200px; border: 0; }
-#musicForm { font-size: 12px; }
-#musicForm button { margin-top: 8px; }
+#musicForm { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 6px; font-size: 12px; }
+#musicForm label { grid-column: 1 / -1; }
+#musicForm input { min-width: 0; margin: 0; padding: 6px 8px; font-size: 12px; }
 
 #roomStatus { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); max-width: calc(100% - 24px); margin: 0; padding: 8px 14px; border-radius: 10px; background: #fff2d3; color: #68461d; box-shadow: 0 3px 12px #27392e30; text-align: center; pointer-events: none; }
 #roomStatus:empty { display: none; }

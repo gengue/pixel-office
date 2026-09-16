@@ -71,8 +71,11 @@
         <p id="screenHint" class="hint"></p>
       </section>
       <section id="musicPanel" aria-labelledby="musicHeading">
-        <h2 id="musicHeading">Reading room · turntable</h2>
-        <p class="hint">Quiet jazz: Bill Evans · Peace Piece. Your music fades as you walk away.</p>
+        <div class="panelHeading">
+          <h2 id="musicHeading">Reading room · turntable</h2>
+          <button id="musicClose" type="button" class="ghost" aria-label="Close music player" title="Close music player">×</button>
+        </div>
+        <p class="hint">Default jazz · Bill Evans — Peace Piece</p>
         <div id="musicVideo"><div id="youtubePlayer"></div></div>
         <div class="row" role="group" aria-label="Music controls">
           <button id="musicPlay" type="button">Play</button>
@@ -81,13 +84,16 @@
         </div>
         <p id="musicRange" class="hint"></p>
         <form id="musicForm">
-          <label for="musicUrl">Choose a YouTube song</label>
-          <input id="musicUrl" type="url" maxlength="2048" placeholder="https://www.youtube.com/watch?v=…" required />
-          <button type="submit" class="sm">Load song</button>
+          <label for="musicUrl">YouTube song</label>
+          <input id="musicUrl" type="url" maxlength="2048" placeholder="YouTube link" required />
+          <button type="submit" class="sm">Load</button>
         </form>
-        <p id="musicStatus" class="hint" role="status">Press Play to enable music. Maximum volume: 50%.</p>
+        <p id="musicStatus" class="hint" role="status"></p>
       </section>
-      <h2>messages</h2>
+      <div class="panelHeading">
+        <h2>messages</h2>
+        <button id="musicOpen" type="button" class="ghost sm" aria-controls="musicPanel" hidden>♫ Music</button>
+      </div>
       <div id="flagBar" title="countries in the office"></div>
       <div id="history"></div>
       <form id="chatForm">

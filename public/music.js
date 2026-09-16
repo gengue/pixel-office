@@ -41,7 +41,7 @@ export function setupMusic(getPosition) {
     if (!force && performance.now() - lastUpdate < 150) return
     lastUpdate = performance.now()
     volume = musicVolume(getPosition())
-    $('musicRange').textContent = volume ? `Nearby · volume ${volume}%` : 'Walk closer to the reading room turntable to hear it.'
+    $('musicRange').textContent = volume ? `Volume ${volume}%` : 'Out of range'
     if (document.hidden || !$('musicPanel').getClientRects().length) { stop(); return }
     if (!ready) return
     if (player.getVolume() !== volume) player.setVolume(volume)
@@ -67,11 +67,11 @@ export function setupMusic(getPosition) {
               pause.disabled = event.data !== 1 && event.data !== 3
               if (event.data === 1) {
                 update(true)
-                status.textContent = 'Playing · only you hear this selection.'
+                status.textContent = 'Playing'
               } else if (event.data === 2) status.textContent = 'Paused.'
-              else if (event.data === 0) status.textContent = 'Finished. Press Play to listen again.'
+              else if (event.data === 0) status.textContent = 'Finished'
             },
-            onAutoplayBlocked() { status.textContent = 'Press Play in the YouTube player to allow music.' },
+            onAutoplayBlocked() { status.textContent = 'Playback blocked by browser.' },
             onError() { status.textContent = 'YouTube could not play this video. It may be unavailable or block embedding. Try another link.' },
           },
         })
@@ -110,13 +110,25 @@ export function setupMusic(getPosition) {
       player.unMute()
       if (id !== videoId) { videoId = id; player.loadVideoById(id) }
       else player.playVideo()
-      status.textContent = 'Press Play in the video if playback does not start.'
+      status.textContent = ''
     } catch (error) { status.textContent = error.message }
     finally { play.disabled = false }
   }
 
   play.onclick = () => start()
   pause.onclick = stop
+  $('musicClose').onclick = () => {
+    stop()
+    status.textContent = 'Paused.'
+    $('musicPanel').hidden = true
+    $('musicOpen').hidden = false
+    $('musicOpen').focus()
+  }
+  $('musicOpen').onclick = () => {
+    $('musicPanel').hidden = false
+    $('musicOpen').hidden = true
+    $('musicPlay').focus()
+  }
   $('musicForm').onsubmit = (event) => {
     event.preventDefault()
     const id = youtubeId($('musicUrl').value)
