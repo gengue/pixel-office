@@ -1,3 +1,4 @@
+import { pathToPerson } from './navigation.js'
 import { WORLD, BODY_R, walls, furn, hitsSolid } from './world.js'
 import { parseDestination, meetingURL } from './meeting-links.js'
 import { BODIES, BODY_KINDS, OUTFIT_COLORS, ACCESSORIES, normalizeAppearance, drawBody, renderPreview } from './avatars.js'
@@ -237,6 +238,7 @@ function connect() {
   }
   ws.onerror = () => failJoin('Could not reach the server. Check your connection and try again.')
   ws.onclose = () => {
+    cancelVisit()
     screenShare.reset()
     if (!$('stage').hidden && !myId) failJoin('Connection lost before entering. Try again.')
   }
@@ -265,6 +267,7 @@ function connect() {
         p.ty = m.y
       }
     } else if (m.t === 'move-blocked') {
+      cancelVisit()
       Object.assign(me, { x: m.x, y: m.y, tx: null, ty: null, sitting: m.sitting })
       showRoomNotice(`${m.room} is full`)
     } else if (m.t === 'peer-leave') {
@@ -389,6 +392,7 @@ for (const button of document.querySelectorAll('.meetingLinkBtn')) button.onclic
   const current = rooms.find((room) => me.x >= room.x && me.x < room.x + room.w && me.y >= room.y && me.y < room.y + room.h)
   $('meetingDestination').value = current?.alias ?? 'meeting'
   updateMeetingLink()
+  cancelVisit()
   $('meetingDialog').showModal()
 }
 $('closeMeeting').onclick = () => $('meetingDialog').close()
@@ -497,6 +501,30 @@ setInterval(() => {
   }
 }, 1200)
 
+// ---------- people navigation ----------
+let visit = null
+function cancelVisit() {
+  if (!visit) return
+  visit = null
+  me.tx = me.ty = null
+  refreshRoster()
+}
+function visitPerson(id) {
+  if (visit?.id === id) { cancelVisit(); return }
+  const peer = peers.get(id)
+  if (!peer) return
+  standUp()
+  const target = { x: peer.tx ?? peer.x, y: peer.ty ?? peer.y }
+  const path = pathToPerson(me, target, [...peers.values()])
+  cancelVisit()
+  me.tx = me.ty = null
+  if (!path) { showRoomNotice(`Cannot reach ${peer.name}: no free route`); return }
+  if (!path.length) { showRoomNotice(`You are beside ${peer.name}`); return }
+  visit = { id, path, target, planned: performance.now() }
+  showRoomNotice(`Walking to ${peer.name} · move or press Esc to cancel`)
+  refreshRoster()
+}
+
 // ---------- sitting ----------
 let roomNoticeTimer
 function showRoomNotice(text) {
@@ -522,6 +550,7 @@ function standUp() {
   sendSit()
 }
 function toggleSit() {
+  cancelVisit()
   if (me.sitting) {
     standUp()
     return
@@ -552,11 +581,13 @@ addEventListener('keydown', (e) => {
     return
   }
   if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' '].includes(e.key)) e.preventDefault()
+  if (['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright', 'escape'].includes(e.key.toLowerCase())) cancelVisit()
   keys.add(e.key.toLowerCase())
 })
 addEventListener('keyup', (e) => keys.delete(e.key.toLowerCase()))
 
 canvas.addEventListener('pointerdown', (e) => {
+  cancelVisit()
   standUp()
   const r = canvas.getBoundingClientRect()
   me.tx = cam.x + ((e.clientX - r.left) / r.width) * VIEW.w
@@ -975,6 +1006,23 @@ function tick(now) {
     if (keys.has('s') || keys.has('arrowdown')) vy += 1
     if (keys.has('a') || keys.has('arrowleft')) vx -= 1
     if (keys.has('d') || keys.has('arrowright')) vx += 1
+    if (visit) {
+      const peer = peers.get(visit.id)
+      if (!peer) cancelVisit()
+      else {
+        const target = { x: peer.tx ?? peer.x, y: peer.ty ?? peer.y }
+        if (now - visit.planned > 500 && Math.hypot(target.x - visit.target.x, target.y - visit.target.y) > 24) {
+          const id = visit.id
+          cancelVisit()
+          visitPerson(id)
+        }
+        if (visit) {
+          while (visit.path.length && Math.hypot(visit.path[0].x - me.x, visit.path[0].y - me.y) < 1) visit.path.shift()
+          if (!visit.path.length) { showRoomNotice(`You are beside ${peer.name}`); cancelVisit() }
+          else { me.tx = visit.path[0].x; me.ty = visit.path[0].y }
+        }
+      }
+    }
     me.moving = false
     if (vx || vy) {
       standUp()
@@ -986,10 +1034,11 @@ function tick(now) {
       const dx = me.tx - me.x
       const dy = me.ty - me.y
       const d = Math.hypot(dx, dy)
-      if (d < 4) {
+      if (d < (visit ? 1 : 4)) {
         me.tx = me.ty = null
       } else {
-        step((dx / d) * SPEED * dt, (dy / d) * SPEED * dt)
+        step((dx / d) * Math.min(d, SPEED * (visit ? 2 : 1) * dt), (dy / d) * Math.min(d, SPEED * (visit ? 2 : 1) * dt))
+        if (visit && me.x === oldX && me.y === oldY) { cancelVisit(); showRoomNotice("Route blocked; select the person again") }
         me.moving = true
       }
     }
@@ -1078,6 +1127,7 @@ function refreshRoster() {
   $('count').textContent = `${peers.size + 1} in the office`
   $('peerCount').textContent = `(${peers.size + 1})`
   const ul = $('peers')
+  const focused = ul.contains(document.activeElement) ? document.activeElement.dataset.peer : null
   ul.innerHTML = ''
   const rows = [{ name: `${me.name} (you)`, country: me.country, hand: me.hand, sitting: me.sitting, self: true }, ...peers.values()]
   const seen = new Map() // country -> names[]
@@ -1100,8 +1150,20 @@ function refreshRoster() {
     li.innerHTML = `<span><i class="dot${near ? ' talk' : ''}"></i></span><span class="kind"></span>`
     li.firstChild.append(document.createTextNode(`${p.sitting ? '🪑 ' : ''}${p.hand ? '✋ ' : ''}${flag(p.country)} ${p.name}`.trim()))
     li.querySelector('.kind').textContent = p.self ? BODIES[me.body].label : BODIES[p.body]?.label ?? p.body
+    if (!p.self) {
+      const button = document.createElement('button')
+      button.type = 'button'
+      button.dataset.peer = p.id
+      button.setAttribute('aria-label', `Walk to ${p.name}`)
+      button.setAttribute('aria-pressed', String(visit?.id === p.id))
+      button.title = visit?.id === p.id ? 'Cancel walk' : `Walk to ${p.name}`
+      button.append(...li.childNodes)
+      button.onclick = () => visitPerson(p.id)
+      li.append(button)
+    }
     ul.append(li)
   }
+  if (focused) [...ul.querySelectorAll('button')].find((b) => b.dataset.peer === focused)?.focus({ preventScroll: true })
 }
 setInterval(() => {
   if (!$('stage').hidden) refreshRoster()

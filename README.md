@@ -111,3 +111,5 @@ The TURN configuration endpoint is also public, so operate it with provider quot
 WebRTC uses a peer mesh, including one screen stream per viewer. It is intended for
 small groups. Seats avoid occupied positions on the client but simultaneous claims
 are not arbitrated by the server. Camera capture targets 320×240 to limit bandwidth.
+
+Click a person in **People** to walk quickly beside them, following a free route around walls and furniture. Select them again, press Esc, or move manually to cancel. Full rooms remain inaccessible.

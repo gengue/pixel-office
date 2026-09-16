@@ -163,3 +163,8 @@ body:has(#reactionPicker:popover-open) #reactionFeed { bottom: calc(var(--dock-h
 #meetingCopyStatus { font-size: 13px; color: var(--acc); }
 #meetingCopyStatus:empty { display: none; }
 .meetingLinkBtn { min-height: 44px; }
+
+#peers li:has(button) { padding: 0; }
+#peers button { display: flex; justify-content: space-between; gap: 8px; width: 100%; text-align: left; padding: 4px 8px; border: 0; background: transparent; color: inherit; font: inherit; }
+#peers button:hover, #peers button[aria-pressed="true"] { background: #7c5cff33; }
+#peers button:focus-visible { outline: 2px solid var(--accent, #a78bfa); outline-offset: 2px; }
