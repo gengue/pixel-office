@@ -1,7 +1,7 @@
 # pixel-office · experimento oficina virtual
 
 Avatares pixel (hombre, mujer, orco, lagarto, robot, fantasma) + cabeza = webcam live.
-Movimiento WASD/flechas o click. Voz por proximidad WebRTC (<220px). Chat con links + burbujas.
+Movimiento WASD/flechas o click. Voz por proximidad WebRTC (acércate para hablar). Chat con links + burbujas.
 
 ## run
 

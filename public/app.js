@@ -98,14 +98,45 @@ function addBubble(pid, text) {
 }
 
 // ---------- websocket ----------
+function setStatus(t, busy = false) {
+  const el = $('joinStatus')
+  el.textContent = t
+  el.classList.toggle('busy', busy)
+}
+
+function failJoin(msg) {
+  const btn = $('joinBtn')
+  btn.disabled = false
+  btn.textContent = 'entrar a oficina →'
+  setStatus('')
+  $('lobbyErr').textContent = msg
+}
+
+function enterStage() {
+  if (!$('stage').hidden) return
+  $('lobby').hidden = true
+  $('stage').hidden = false
+  $('meLabel').textContent = `${me.name} · ${BODIES[me.body].label}`
+  refreshRoster()
+}
+
 function connect() {
   ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`)
+  ws.onopen = () => {
+    setStatus('entrando…', true)
+    send({ t: 'join', name: me.name, body: me.body, x: me.x, y: me.y })
+  }
+  ws.onerror = () => failJoin('No se pudo conectar al servidor. Revisa tu conexión e inténtalo de nuevo.')
+  ws.onclose = () => {
+    if (!$('stage').hidden && !myId) failJoin('Conexión perdida antes de entrar. Inténtalo de nuevo.')
+  }
   ws.onmessage = (ev) => {
     const m = JSON.parse(ev.data)
     if (m.t === 'welcome') {
       myId = m.id
+      setStatus('')
       for (const p of m.roster) if (p.id !== myId) upsertPeer(p)
-      refreshRoster()
+      enterStage()
     } else if (m.t === 'peer-join') {
       upsertPeer(m.player)
       refreshRoster()
@@ -118,6 +149,12 @@ function connect() {
     } else if (m.t === 'peer-leave') {
       peers.delete(m.id)
       closePC(m.id)
+      for (const [bid, b] of bubbles) {
+        if (b.pid === m.id) {
+          b.el.remove()
+          bubbles.delete(bid)
+        }
+      }
       refreshRoster()
     } else if (m.t === 'chat') {
       addHistory(m.name, m.text, m.at)
@@ -232,32 +269,49 @@ canvas.addEventListener('pointerdown', (e) => {
 })
 
 // ---------- join / leave ----------
-$('joinBtn').onclick = async () => {
+$('joinBtn').onclick = () => {
+  const btn = $('joinBtn')
+  btn.disabled = true
+  btn.textContent = 'entrando…'
+  $('lobbyErr').textContent = ''
+  setStatus('conectando…', true)
   const name = $('name').value.trim() || `user${Math.floor(Math.random() * 999)}`
   me.name = name.slice(0, 24)
   me.body = picked
   me.x = 120 + Math.random() * 720
   me.y = 140 + Math.random() * 380
-  if (!localStream) {
-    try {
-      localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true })
-      $('selfVideo').srcObject = localStream
-      await $('selfVideo').play().catch(() => {})
-    } catch {
-      $('lobbyErr').textContent = 'Sin cámara: entras con iniciales.'
-    }
+  // cámara en paralelo: no bloquea entrada. Si falla, entras con iniciales.
+  if (!localStream && navigator.mediaDevices?.getUserMedia) {
+    setStatus('pidiendo cámara…', true)
+    navigator.mediaDevices
+      .getUserMedia({ video: { width: { ideal: 320 }, height: { ideal: 240 } }, audio: true })
+      .then(async (s) => {
+        localStream = s
+        $('selfVideo').srcObject = s
+        await $('selfVideo').play().catch(() => {})
+        if ($('stage').hidden) setStatus('conectando…', true)
+      })
+      .catch(() => {
+        if ($('stage').hidden) setStatus('sin cámara: entrarás con iniciales…', true)
+      })
   }
-  $('lobby').hidden = true
-  $('stage').hidden = false
-  $('meLabel').textContent = `${me.name} · ${BODIES[me.body].label}`
   connect()
-  const t = setInterval(() => {
-    if (ws?.readyState === 1) {
-      send({ t: 'join', name: me.name, body: me.body, x: me.x, y: me.y })
-      clearInterval(t)
+  setTimeout(() => {
+    if ($('stage').hidden && btn.disabled) {
+      try {
+        ws?.close()
+      } catch {}
+      failJoin('El servidor tarda en responder. Inténtalo de nuevo.')
     }
-  }, 100)
+  }, 10000)
 }
+
+// cierre pestaña -> close frame explícito, server limpia peer al instante
+addEventListener('beforeunload', () => {
+  try {
+    ws?.close()
+  } catch {}
+})
 
 $('leaveBtn').onclick = () => location.reload()
 $('muteBtn').onclick = (e) => {

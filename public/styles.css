@@ -16,6 +16,10 @@ input { width: 100%; margin-top: 6px; padding: 10px; border-radius: 10px; border
 button { background: var(--acc); border: 0; color: white; border-radius: 10px; padding: 10px 14px; cursor: pointer; font-weight: 700; }
 button.ghost { background: transparent; border: 1px solid var(--line); color: var(--txt); }
 button.sm { padding: 6px 10px; font-weight: 600; }
+button:disabled { opacity: 0.6; cursor: wait; }
+.status { color: var(--dim); min-height: 1em; margin: 8px 0 0; }
+.status.busy::before { content: "● "; animation: blink 1s infinite; color: var(--acc); }
+@keyframes blink { 50% { opacity: 0.2; } }
 .err { color: #f87171; min-height: 1em; }
 .hint { color: var(--dim); font-size: 12px; }
 #stage header { display: flex; gap: 10px; align-items: center; padding: 10px 14px; border-bottom: 1px solid var(--line); background: #12163a; }
