@@ -1,7 +1,7 @@
 // Pixel bodies 12x16. '.' = transparente. Cabeza = webcam (no incluida aqui).
 export const BODIES = {
   hombre: {
-    label: 'Hombre',
+    label: 'Man',
     palette: { C: '#3b82f6', S: '#f1c27d', D: '#1e40af', P: '#1e3a8a', B: '#1f2937' },
     rows: [
       '..CCCCCCCC..',
@@ -23,7 +23,7 @@ export const BODIES = {
     ],
   },
   mujer: {
-    label: 'Mujer',
+    label: 'Woman',
     palette: { C: '#ec4899', S: '#ffdbac', D: '#be185d', P: '#831843', B: '#3f3f46' },
     rows: [
       '..CCCCCCCC..',
@@ -46,7 +46,7 @@ export const BODIES = {
     extra: { E: '#f9a8d4' },
   },
   orco: {
-    label: 'Orco',
+    label: 'Orc',
     palette: { C: '#4d7c0f', S: '#65a30d', D: '#78350f', P: '#44403c', B: '#292524', E: '#fefce8' },
     rows: [
       'E.CCCCCCCC.E',
@@ -68,7 +68,7 @@ export const BODIES = {
     ],
   },
   lagarto: {
-    label: 'Lagarto',
+    label: 'Lizard',
     palette: { C: '#10b981', S: '#34d399', D: '#059669', P: '#065f46', B: '#064e3b', E: '#fde047' },
     rows: [
       '..CCCCCCCC..',
@@ -112,7 +112,7 @@ export const BODIES = {
     ],
   },
   fantasma: {
-    label: 'Fantasma',
+    label: 'Ghost',
     palette: { C: '#c7d2fe', S: '#e0e7ff', D: '#818cf8', P: '#a5b4fc', B: '#6366f1', E: '#312e81' },
     rows: [
       '..CCCCCCCC..',

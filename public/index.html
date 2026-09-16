@@ -1,40 +1,40 @@
 <!doctype html>
-<html lang="es">
+<html lang="en">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>pixel-office · oficina virtual</title>
+<title>Pixel Office · virtual office</title>
 <link rel="stylesheet" href="/styles.css" />
 </head>
 <body>
 <div id="lobby">
   <div class="card">
-    <h1>pixel-office</h1>
-    <p class="sub">Tu cabeza es tu cámara en vivo y hablas acercándote a otros. Por eso necesitas permitir <b>cámara y micrófono</b> para entrar.</p>
-    <label class="field">Tu nombre
-      <input id="name" maxlength="24" placeholder="ej. ada" autocomplete="off" />
+    <h1>Pixel Office</h1>
+    <p class="sub">Your head is your live camera and you talk by walking up to others. That is why you must allow <b>camera and microphone</b> to enter.</p>
+    <label class="field">Your name
+      <input id="name" maxlength="24" placeholder="e.g. ada" autocomplete="off" />
     </label>
-    <div class="field">Cuerpo pixel
+    <div class="field">Pixel body
       <div id="bodies" class="bodies"></div>
     </div>
     <div class="row">
-      <button id="joinBtn" type="button">entrar a oficina →</button>
+      <button id="joinBtn" type="button">enter office →</button>
     </div>
     <p id="joinStatus" class="status" aria-live="polite"></p>
     <p id="lobbyErr" class="err"></p>
-    <p class="hint">WASD / flechas o click para moverte. Acércate a alguien para hablar por voz.</p>
+    <p class="hint">WASD / arrows or click to move. Walk up to someone to talk by voice.</p>
   </div>
 </div>
 
 <div id="stage" hidden>
   <header>
-    <strong>pixel-office</strong>
+    <strong>Pixel Office</strong>
     <span id="meLabel"></span>
-    <span id="callLabel" class="pill">fuera de llamada</span>
+    <span id="callLabel" class="pill">not in call</span>
     <span class="spacer"></span>
     <span id="count"></span>
-    <button id="muteBtn" class="ghost sm" type="button">mutear</button>
-    <button id="leaveBtn" class="ghost sm" type="button">salir</button>
+    <button id="muteBtn" class="ghost sm" type="button">mute</button>
+    <button id="leaveBtn" class="ghost sm" type="button">leave</button>
   </header>
   <main>
     <div id="canvasWrap">
@@ -42,13 +42,13 @@
       <div id="bubbles"></div>
     </div>
     <aside>
-      <h2>mensajes</h2>
+      <h2>messages</h2>
       <div id="history"></div>
       <form id="chatForm">
-        <input id="chatInput" maxlength="500" placeholder="escribe… pega un link" autocomplete="off" />
-        <button type="submit">enviar</button>
+        <input id="chatInput" maxlength="500" placeholder="type… paste a link" autocomplete="off" />
+        <button type="submit">send</button>
       </form>
-      <h2>gente <span id="peerCount"></span></h2>
+      <h2>people <span id="peerCount"></span></h2>
       <ul id="peers"></ul>
     </aside>
   </main>

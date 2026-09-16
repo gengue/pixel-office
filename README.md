@@ -1,24 +1,24 @@
-# pixel-office · experimento oficina virtual
+# Pixel Office · virtual office experiment
 
-Avatares pixel (hombre, mujer, orco, lagarto, robot, fantasma) + cabeza = webcam live.
-Movimiento WASD/flechas o click. Voz por proximidad WebRTC (acércate para hablar). Chat con links + burbujas.
+Pixel avatars (man, woman, orc, lizard, robot, ghost) + your live webcam as the head.
+Move with WASD/arrows or click. Proximity voice over WebRTC (walk up to talk). Chat with links + bubbles.
 
 ## run
 
 ```bash
 bun --cwd /home/genesis/workspace/pixel-office dev
-# abre http://localhost:3000
+# open http://localhost:3000
 ```
 
-Abre 2 pestañas, elige cuerpos distintos, permite cámara + micro al entrar, acércate para hablar.
-Chat: pega `https://example.com`, abre en pestaña nueva. Burbuja trunca a 72px con ellipsis, click expande.
+Open 2 tabs, pick different bodies, allow camera + mic on entry, walk close to talk.
+Chat: paste `https://example.com`, it opens in a new tab. Bubbles clamp to 72px with ellipsis, click to expand.
 
 ## stack
 
-Bun.serve + WebSocket nativo (señalización + posiciones + chat). WebRTC mesh P2P solo audio/video entre cercanos. Sin deps.
+Bun.serve + native WebSocket (signaling + positions + chat). Mesh P2P WebRTC for audio/video between nearby peers only. Zero deps.
 
-## límites experimento
+## experiment limits
 
-- Sin persistencia, sin auth, una sola sala.
-- STUN público Google. En NAT simétrica puede fallar voz; chat y movimiento siguen.
-- Video 320p para ahorrar ancho de banda.
+- No persistence, no auth, single room.
+- Public Google STUN. Voice can fail on symmetric NAT; chat and movement keep working.
+- 320p video to save bandwidth.

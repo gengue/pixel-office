@@ -26,7 +26,7 @@ type SockData = { id: string; player: Player; tab?: string }
 
 const sockets = new Set<any>()
 const byId = new Map<string, any>()
-const tabs = new Map<string, any>() // tabId -> ws (una pestaña = un player)
+const tabs = new Map<string, any>() // tabId -> ws (one tab = one player)
 let seq = 0
 
 function spawnPoint(): { x: number; y: number } {
@@ -125,4 +125,4 @@ const server = Bun.serve<SockData>({
   },
 })
 
-console.log(`pixel-office en http://localhost:${server.port}`)
+console.log(`Pixel Office at http://localhost:${server.port}`)

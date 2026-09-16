@@ -75,7 +75,7 @@ function addBubble(pid, text) {
   inner.className = 'clamp'
   inner.textContent = text
   el.append(inner)
-  el.title = 'click para expandir'
+  el.title = 'click to expand'
   el.onclick = () => el.classList.toggle('open')
   $('bubbles').append(el)
   const id = Math.random().toString(36).slice(2)
@@ -96,7 +96,7 @@ function setStatus(t, busy = false) {
 function failJoin(msg) {
   const btn = $('joinBtn')
   btn.disabled = false
-  btn.textContent = 'entrar a oficina →'
+  btn.textContent = 'enter office →'
   setStatus('')
   $('lobbyErr').textContent = msg
 }
@@ -114,18 +114,18 @@ function enterStage() {
 }
 
 function connect() {
-  // mata conexión previa: una pestaña = un player (evita gemelo fantasma)
+  // drop previous connection: one tab = one player (avoids ghost twin)
   try {
     ws?.close()
   } catch {}
   ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`)
   ws.onopen = () => {
-    setStatus('entrando…', true)
+    setStatus('joining…', true)
     send({ t: 'join', tab: tabId, name: me.name, body: me.body, x: me.x, y: me.y })
   }
-  ws.onerror = () => failJoin('No se pudo conectar al servidor. Revisa tu conexión e inténtalo de nuevo.')
+  ws.onerror = () => failJoin('Could not reach the server. Check your connection and try again.')
   ws.onclose = () => {
-    if (!$('stage').hidden && !myId) failJoin('Conexión perdida antes de entrar. Inténtalo de nuevo.')
+    if (!$('stage').hidden && !myId) failJoin('Connection lost before entering. Try again.')
   }
   ws.onmessage = (ev) => {
     const m = JSON.parse(ev.data)
@@ -200,7 +200,7 @@ function closePC(pid) {
 }
 
 async function maybeCall(pid) {
-  if (myId === null || pid <= myId) return // solo el id mayor inicia
+  if (myId === null || pid <= myId) return // only highest id initiates
   const pc = ensurePC(pid)
   if (!pc || pc.signalingState !== 'stable') return
   const offer = await pc.createOffer()
@@ -270,18 +270,18 @@ canvas.addEventListener('pointerdown', (e) => {
 $('joinBtn').onclick = async () => {
   const btn = $('joinBtn')
   if (btn.disabled) return
-  if (ws && ws.readyState <= 1) return // join ya en curso
+  if (ws && ws.readyState <= 1) return // join already in progress
   btn.disabled = true
-  btn.textContent = 'entrando…'
+  btn.textContent = 'joining…'
   $('lobbyErr').textContent = ''
   const name = $('name').value.trim() || `user${Math.floor(Math.random() * 999)}`
   me.name = name.slice(0, 24)
   me.body = picked
   me.x = 120 + Math.random() * 720
   me.y = 140 + Math.random() * 380
-  // cámara + micro obligatorios: sin ellos no hay cabeza ni voz, no se entra
+  // camera + mic required: no head or voice without them, no entry
   if (!localStream) {
-    setStatus('pidiendo cámara y micrófono…', true)
+    setStatus('asking for camera and microphone…', true)
     try {
       localStream = await navigator.mediaDevices.getUserMedia({
         video: { width: { ideal: 320 }, height: { ideal: 240 } },
@@ -294,27 +294,27 @@ $('joinBtn').onclick = async () => {
       const missing = e?.name === 'NotFoundError' || e?.name === 'OverconstrainedError'
       failJoin(
         denied
-          ? 'Permiso denegado: permite cámara y micrófono en el navegador (ícono 🔒 en la barra) e inténtalo de nuevo.'
+          ? 'Permission denied: allow camera and microphone in the browser (lock icon in the address bar) and try again.'
           : missing
-            ? 'No se encontró cámara o micrófono. Conecta un dispositivo e inténtalo de nuevo.'
-            : 'No se pudo activar cámara/micrófono. Revisa el navegador e inténtalo de nuevo.'
+            ? 'No camera or microphone found. Plug in a device and try again.'
+            : 'Could not start camera/microphone. Check the browser and try again.'
       )
       return
     }
   }
-  setStatus('conectando…', true)
+  setStatus('connecting…', true)
   connect()
   setTimeout(() => {
     if ($('stage').hidden && btn.disabled) {
       try {
         ws?.close()
       } catch {}
-      failJoin('El servidor tarda en responder. Inténtalo de nuevo.')
+      failJoin('The server is taking too long to respond. Try again.')
     }
   }, 10000)
 }
 
-// cierre pestaña -> close frame explícito, server limpia peer al instante
+// tab close -> explicit close frame, server drops peer instantly
 addEventListener('beforeunload', () => {
   try {
     ws?.close()
@@ -325,7 +325,7 @@ $('leaveBtn').onclick = () => location.reload()
 $('muteBtn').onclick = (e) => {
   muted = !muted
   localStream?.getAudioTracks().forEach((t) => (t.enabled = !muted))
-  e.target.textContent = muted ? 'unmutear' : 'mutear'
+  e.target.textContent = muted ? 'unmute' : 'mute'
 }
 $('chatForm').onsubmit = (e) => {
   e.preventDefault()
@@ -341,12 +341,12 @@ function drawOffice() {
   ctx.fillRect(0, 0, W, H)
   ctx.fillStyle = '#272e68'
   for (let y = 0; y < H; y += 40) for (let x = (y / 40) % 2 ? 0 : 40; x < W; x += 80) ctx.fillRect(x, y, 40, 40)
-  // alfombra central
+  // center rug
   ctx.fillStyle = '#7c5cff33'
   ctx.fillRect(280, 180, 400, 240)
   ctx.strokeStyle = '#7c5cff88'
   ctx.strokeRect(280, 180, 400, 240)
-  // mesas
+  // desks
   ctx.fillStyle = '#3b2f2f'
   for (const [x, y] of [[120, 120], [700, 120], [120, 440], [700, 440]]) {
     ctx.fillRect(x, y, 140, 60)
@@ -362,7 +362,7 @@ function drawOffice() {
   }
   ctx.fillStyle = '#9aa1d088'
   ctx.font = '12px system-ui'
-  ctx.fillText('acércate para hablar · click o WASD para moverte', 330, 30)
+  ctx.fillText('walk close to talk · click or WASD to move', 330, 30)
 }
 
 function drawHead(x, y, r, videoEl, initials) {
@@ -400,7 +400,7 @@ function drawAvatar(p, videoEl, isMe, inCall) {
   const headR = 22
   const cx = p.x
   const bodyY = p.y - 8
-  // sombra
+  // shadow
   ctx.fillStyle = '#00000055'
   ctx.beginPath()
   ctx.ellipse(cx, bodyY + 64, 26, 7, 0, 0, 7)
@@ -416,7 +416,7 @@ function drawAvatar(p, videoEl, isMe, inCall) {
   drawHead(cx, bodyY - headR + 6, headR, videoEl, initialsOf(p.name || '?'))
   // nametag
   ctx.font = 'bold 12px system-ui'
-  const label = `${p.name}${isMe ? ' (tú)' : ''}`
+  const label = `${p.name}${isMe ? ' (you)' : ''}`
   const tw = ctx.measureText(label).width + 14
   ctx.fillStyle = isMe ? '#7c5cff' : '#0d1030dd'
   ctx.strokeStyle = '#111'
@@ -438,7 +438,7 @@ function tick(now) {
   const dt = Math.min(0.05, (now - last) / 1000)
   last = now
   if (! $('stage').hidden) {
-    // movimiento
+    // movement
     let vx = 0
     let vy = 0
     if (keys.has('w') || keys.has('arrowup')) vy -= 1
@@ -471,7 +471,7 @@ function tick(now) {
       send({ t: 'move', x: Math.round(me.x), y: Math.round(me.y) })
       lastSent = now
     }
-    // interpolación remotos
+    // remote interpolation
     for (const p of peers.values()) {
       if (p.tx !== undefined) {
         const dx = p.tx - p.x
@@ -493,7 +493,7 @@ function tick(now) {
     const inCall = new Set()
     for (const p of peers.values()) if (dist(me, p) < TALK) inCall.add(p.id)
     for (const a of all) drawAvatar(a, a.video, a.isMe, a.isMe ? inCall.size > 0 : inCall.has(a.id))
-    // burbujas siguen avatar
+    // bubbles follow avatar
     const r = canvas.getBoundingClientRect()
     const sx = r.width / W
     const sy = r.height / H
@@ -503,13 +503,13 @@ function tick(now) {
       el.style.left = `${p.x * sx}px`
       el.style.top = `${(p.y - 78) * sy}px`
     }
-    // HUD llamada
+    // call HUD
     const pill = $('callLabel')
     if (inCall.size > 0) {
-      pill.textContent = `en llamada · ${inCall.size}`
+      pill.textContent = `in call · ${inCall.size}`
       pill.classList.add('on')
     } else {
-      pill.textContent = 'fuera de llamada'
+      pill.textContent = 'not in call'
       pill.classList.remove('on')
     }
   }
@@ -517,11 +517,11 @@ function tick(now) {
 }
 
 function refreshRoster() {
-  $('count').textContent = `${peers.size + 1} en oficina`
+  $('count').textContent = `${peers.size + 1} in the office`
   $('peerCount').textContent = `(${peers.size + 1})`
   const ul = $('peers')
   ul.innerHTML = ''
-  const rows = [{ name: `${me.name} (tú)`, self: true }, ...peers.values()]
+  const rows = [{ name: `${me.name} (you)`, self: true }, ...peers.values()]
   for (const p of rows) {
     const li = document.createElement('li')
     const near = p.self ? false : dist(me, p) < TALK
