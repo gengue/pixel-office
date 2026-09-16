@@ -10,7 +10,7 @@ bun --cwd /home/genesis/workspace/pixel-office dev
 # abre http://localhost:3000
 ```
 
-Abre 2 pestañas, elige cuerpos distintos, activa cámara, acércate para hablar.
+Abre 2 pestañas, elige cuerpos distintos, permite cámara + micro al entrar, acércate para hablar.
 Chat: pega `https://example.com`, abre en pestaña nueva. Burbuja trunca a 72px con ellipsis, click expande.
 
 ## stack

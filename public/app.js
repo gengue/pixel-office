@@ -32,20 +32,6 @@ for (const kind of BODY_KINDS) {
 }
 
 let localStream = null
-$('camBtn').onclick = async () => {
-  $('lobbyErr').textContent = ''
-  try {
-    localStream = await navigator.mediaDevices.getUserMedia({
-      video: { width: { ideal: 320 }, height: { ideal: 240 } },
-      audio: { echoCancellation: true, noiseSuppression: true },
-    })
-    $('selfVideo').srcObject = localStream
-    await $('selfVideo').play().catch(() => {})
-    $('camBtn').textContent = 'cámara lista ✓'
-  } catch {
-    $('lobbyErr').textContent = 'Sin cámara: entras con iniciales. Revisa permisos HTTPS/localhost.'
-  }
-}
 
 // ---------- state ----------
 let ws = null
@@ -281,34 +267,42 @@ canvas.addEventListener('pointerdown', (e) => {
 })
 
 // ---------- join / leave ----------
-$('joinBtn').onclick = () => {
+$('joinBtn').onclick = async () => {
   const btn = $('joinBtn')
   if (btn.disabled) return
   if (ws && ws.readyState <= 1) return // join ya en curso
   btn.disabled = true
   btn.textContent = 'entrando…'
   $('lobbyErr').textContent = ''
-  setStatus('conectando…', true)
   const name = $('name').value.trim() || `user${Math.floor(Math.random() * 999)}`
   me.name = name.slice(0, 24)
   me.body = picked
   me.x = 120 + Math.random() * 720
   me.y = 140 + Math.random() * 380
-  // cámara en paralelo: no bloquea entrada. Si falla, entras con iniciales.
-  if (!localStream && navigator.mediaDevices?.getUserMedia) {
-    setStatus('pidiendo cámara…', true)
-    navigator.mediaDevices
-      .getUserMedia({ video: { width: { ideal: 320 }, height: { ideal: 240 } }, audio: true })
-      .then(async (s) => {
-        localStream = s
-        $('selfVideo').srcObject = s
-        await $('selfVideo').play().catch(() => {})
-        if ($('stage').hidden) setStatus('conectando…', true)
+  // cámara + micro obligatorios: sin ellos no hay cabeza ni voz, no se entra
+  if (!localStream) {
+    setStatus('pidiendo cámara y micrófono…', true)
+    try {
+      localStream = await navigator.mediaDevices.getUserMedia({
+        video: { width: { ideal: 320 }, height: { ideal: 240 } },
+        audio: { echoCancellation: true, noiseSuppression: true },
       })
-      .catch(() => {
-        if ($('stage').hidden) setStatus('sin cámara: entrarás con iniciales…', true)
-      })
+      $('selfVideo').srcObject = localStream
+      await $('selfVideo').play().catch(() => {})
+    } catch (e) {
+      const denied = e?.name === 'NotAllowedError' || e?.name === 'SecurityError'
+      const missing = e?.name === 'NotFoundError' || e?.name === 'OverconstrainedError'
+      failJoin(
+        denied
+          ? 'Permiso denegado: permite cámara y micrófono en el navegador (ícono 🔒 en la barra) e inténtalo de nuevo.'
+          : missing
+            ? 'No se encontró cámara o micrófono. Conecta un dispositivo e inténtalo de nuevo.'
+            : 'No se pudo activar cámara/micrófono. Revisa el navegador e inténtalo de nuevo.'
+      )
+      return
+    }
   }
+  setStatus('conectando…', true)
   connect()
   setTimeout(() => {
     if ($('stage').hidden && btn.disabled) {
