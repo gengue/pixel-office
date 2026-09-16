@@ -58,9 +58,10 @@ const furn = [
   ['plant', 2300, 1470],
 ]
 for (const [x, y, w, h] of walls) solid(x, y, w, h)
+const chairs = furn.filter(([t]) => t === 'chair').map(([, x, y]) => ({ x: x + 14, y: y + 14 }))
+const SIT_RANGE = 36
 for (const [t, x, y, w, h] of furn) {
   if (t === 'plant') solid(x, y, 20, 20)
-  else if (t === 'chair') solid(x, y, 28, 28)
   else if (t === 'board' || t === 'shelf' || t === 'fridge') solid(x, y, w, h)
   else if (t.includes('table') || t === 'desk' || t.startsWith('sofa') || t.startsWith('counter')) {
     solid(x, y, t === 'desk' ? 150 : w, t === 'desk' ? 70 : h)
@@ -104,7 +105,7 @@ let myId = null
 const tabId =
   sessionStorage.getItem('po-tab') ?? crypto.randomUUID?.() ?? String(Math.random())
 sessionStorage.setItem('po-tab', tabId)
-const me = { name: 'anon', body: picked, country: '', hand: false, x: 120, y: 360, tx: null, ty: null, walk: 0, moving: false }
+const me = { name: 'anon', body: picked, country: '', hand: false, sitting: false, x: 120, y: 360, tx: null, ty: null, walk: 0, moving: false }
 const peers = new Map() // id -> {id,name,body,x,y,walk,moving,videoEl}
 window.__po = { me, cam, peers, WORLD, VIEW }
 const pcs = new Map() // id -> RTCPeerConnection
@@ -266,6 +267,17 @@ function connect() {
         p.hand = !!m.hand
         refreshRoster()
       }
+    } else if (m.t === 'peer-sit') {
+      if (m.id === myId) return
+      const p = peers.get(m.id)
+      if (p) {
+        p.sitting = !!m.sitting
+        p.x = m.x
+        p.y = m.y
+        p.tx = m.x
+        p.ty = m.y
+        refreshRoster()
+      }
     } else if (m.t === 'chat') {
       addHistory(m.name, m.text, m.at)
       addBubble(m.id, m.text)
@@ -277,7 +289,7 @@ function connect() {
 
 function upsertPeer(p) {
   if (!peers.has(p.id)) peers.set(p.id, { ...p, tx: p.x, ty: p.y, walk: 0, moving: false, videoEl: null })
-  else Object.assign(peers.get(p.id), { name: p.name, body: p.body, country: p.country ?? '', hand: !!p.hand })
+  else Object.assign(peers.get(p.id), { name: p.name, body: p.body, country: p.country ?? '', hand: !!p.hand, sitting: !!p.sitting })
 }
 
 const send = (o) => ws?.readyState === 1 && ws.send(JSON.stringify(o))
@@ -363,16 +375,54 @@ setInterval(() => {
   }
 }, 1200)
 
+// ---------- sitting ----------
+function sendSit() {
+  send({ t: 'sit', sitting: me.sitting, x: Math.round(me.x), y: Math.round(me.y) })
+}
+function standUp() {
+  if (!me.sitting) return
+  me.sitting = false
+  sendSit()
+}
+function toggleSit() {
+  if (me.sitting) {
+    standUp()
+    return
+  }
+  let best = null
+  let bd = SIT_RANGE
+  for (const c of chairs) {
+    const d = Math.hypot(me.x - c.x, me.y - c.y)
+    if (d < bd) {
+      bd = d
+      best = c
+    }
+  }
+  if (!best) return
+  me.x = best.x
+  me.y = best.y
+  me.tx = me.ty = null
+  me.sitting = true
+  send({ t: 'move', x: Math.round(me.x), y: Math.round(me.y) })
+  sendSit()
+}
+
 // ---------- input ----------
 addEventListener('keydown', (e) => {
   if ($('stage').hidden) return
   if (document.activeElement === $('chatInput')) return
+  if (e.key.toLowerCase() === 'e') {
+    e.preventDefault()
+    toggleSit()
+    return
+  }
   if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' '].includes(e.key)) e.preventDefault()
   keys.add(e.key.toLowerCase())
 })
 addEventListener('keyup', (e) => keys.delete(e.key.toLowerCase()))
 
 canvas.addEventListener('pointerdown', (e) => {
+  standUp()
   const r = canvas.getBoundingClientRect()
   me.tx = cam.x + ((e.clientX - r.left) / r.width) * VIEW.w
   me.ty = cam.y + ((e.clientY - r.top) / r.height) * VIEW.h
@@ -395,21 +445,29 @@ $('joinBtn').onclick = async () => {
   if (!localStream) {
     setStatus('asking for camera and microphone…', true)
     try {
-      localStream = await navigator.mediaDevices.getUserMedia({
-        video: { width: { ideal: 320 }, height: { ideal: 240 } },
-        audio: { echoCancellation: true, noiseSuppression: true },
-      })
+      const gumTimeout = new Promise((_, rej) => setTimeout(() => rej(new Error('cam-timeout')), 15000))
+      localStream = await Promise.race([
+        navigator.mediaDevices.getUserMedia({
+          video: { width: { ideal: 320 }, height: { ideal: 240 } },
+          audio: { echoCancellation: true, noiseSuppression: true },
+        }),
+        gumTimeout,
+      ])
       $('selfVideo').srcObject = localStream
-      await $('selfVideo').play().catch(() => {})
+      // never hang on play(): some browsers stall it, video starts when it can
+      await Promise.race([$('selfVideo').play().catch(() => {}), new Promise((r) => setTimeout(r, 4000))])
     } catch (e) {
       const denied = e?.name === 'NotAllowedError' || e?.name === 'SecurityError'
       const missing = e?.name === 'NotFoundError' || e?.name === 'OverconstrainedError'
+      const timeout = e?.message === 'cam-timeout'
       failJoin(
         denied
           ? 'Permission denied: allow camera and microphone in the browser (lock icon in the address bar) and try again.'
           : missing
             ? 'No camera or microphone found. Plug in a device and try again.'
-            : 'Could not start camera/microphone. Check the browser and try again.'
+            : timeout
+              ? 'Camera/microphone is taking too long to respond. Try again.'
+              : 'Could not start camera/microphone. Check the browser and try again.'
       )
       return
     }
@@ -639,7 +697,7 @@ function drawOffice() {
   }
   ctx.fillStyle = '#9aa1d088'
   ctx.font = '12px system-ui'
-  ctx.fillText('walk close to talk · click or WASD to move', 330, 395)
+  ctx.fillText('walk close to talk · click or WASD to move · E to sit', 330, 395)
 }
 
 const mini = $('mini')
@@ -701,7 +759,7 @@ function drawAvatar(p, videoEl, isMe, inCall) {
   const bw = 12 * s
   const headR = 22
   const cx = p.x
-  const bodyY = p.y - 8
+  const bodyY = p.y - 8 + (p.sitting ? 12 : 0)
   // shadow
   ctx.fillStyle = '#00000055'
   ctx.beginPath()
@@ -757,6 +815,7 @@ function tick(now) {
     if (keys.has('d') || keys.has('arrowright')) vx += 1
     me.moving = false
     if (vx || vy) {
+      standUp()
       const n = Math.hypot(vx, vy)
       step((vx / n) * SPEED * dt, (vy / n) * SPEED * dt)
       me.tx = me.ty = null
@@ -838,7 +897,7 @@ function refreshRoster() {
   $('peerCount').textContent = `(${peers.size + 1})`
   const ul = $('peers')
   ul.innerHTML = ''
-  const rows = [{ name: `${me.name} (you)`, country: me.country, self: true }, ...peers.values()]
+  const rows = [{ name: `${me.name} (you)`, country: me.country, hand: me.hand, sitting: me.sitting, self: true }, ...peers.values()]
   const seen = new Map() // country -> names[]
   for (const p of rows) {
     if (!/^[A-Z]{2}$/.test(p.country ?? '')) continue
@@ -857,7 +916,7 @@ function refreshRoster() {
     const li = document.createElement('li')
     const near = p.self ? false : dist(me, p) < TALK
     li.innerHTML = `<span><i class="dot${near ? ' talk' : ''}"></i></span><span class="kind"></span>`
-    li.firstChild.append(document.createTextNode(`${p.hand ? '✋ ' : ''}${flag(p.country)} ${p.name}`.trim()))
+    li.firstChild.append(document.createTextNode(`${p.sitting ? '🪑 ' : ''}${p.hand ? '✋ ' : ''}${flag(p.country)} ${p.name}`.trim()))
     li.querySelector('.kind').textContent = p.self ? BODIES[me.body].label : BODIES[p.body]?.label ?? p.body
     ul.append(li)
   }
