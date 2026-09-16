@@ -41,13 +41,6 @@
     <span id="callLabel" class="pill">not in call</span>
     <span class="spacer"></span>
     <span id="count"></span>
-    <button id="shareBtn" class="ghost sm" type="button">share screen</button>
-    <button id="reactionBtn" class="ghost sm" type="button" popovertarget="reactionPicker">☺ reactions</button>
-    <div id="reactionPicker" popover aria-label="Choose a reaction"><div id="reactionChoices" role="group" aria-label="Reactions"></div></div>
-    <button id="handBtn" class="ghost sm" type="button">raise hand</button>
-    <button id="muteBtn" class="ghost sm" type="button">mute</button>
-    <button id="leaveBtn" class="ghost sm" type="button">leave</button>
-    <span id="shareStatus" role="status" aria-live="polite"></span>
   </header>
   <main>
     <div id="canvasWrap">
@@ -69,7 +62,6 @@
           <p id="screenWaiting">Connecting to the shared screen…</p>
         </div>
         <p id="screenHint" class="hint"></p>
-        <button id="stopScreen" type="button" hidden>Stop sharing</button>
       </section>
       <h2>messages</h2>
       <div id="flagBar" title="countries in the office"></div>
@@ -82,6 +74,19 @@
       <ul id="peers"></ul>
     </aside>
   </main>
+  <footer id="callDock" aria-label="Call controls">
+    <div class="dockControls" role="group" aria-label="Microphone, reactions and presentation">
+      <button id="muteBtn" class="dockPrimary" type="button" aria-pressed="false" title="Mute microphone">Mic on</button>
+      <button id="reactionBtn" class="dockPrimary" type="button" popovertarget="reactionPicker">React</button>
+      <button id="handBtn" type="button" aria-pressed="false" title="Raise hand">Raise hand</button>
+      <span class="dockDivider" aria-hidden="true"></span>
+      <button id="shareBtn" type="button" aria-pressed="false">Share screen</button>
+      <span class="dockDivider" aria-hidden="true"></span>
+      <button id="leaveBtn" type="button" title="Leave the office">Leave</button>
+    </div>
+    <span id="shareStatus" role="status" aria-live="polite"></span>
+    <div id="reactionPicker" popover aria-label="Choose a reaction"><div id="reactionChoices" role="group" aria-label="Reactions"></div></div>
+  </footer>
 </div>
 
 <div id="reactionFeed" role="status" aria-live="polite" aria-relevant="additions" aria-label="Live reactions"></div>

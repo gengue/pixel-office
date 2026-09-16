@@ -1,105 +1,91 @@
-# Pixel Office · virtual office experiment
+# Pixel Office
 
-Pixel avatars (man, woman, orc, lizard, robot, ghost) + your live webcam as the head.
-Move with WASD/arrows or click. Proximity voice over WebRTC (walk up to talk). Chat with links + bubbles.
+A cozy multiplayer office with pixel avatars, live webcam faces, proximity voice,
+screen sharing and emoji reactions. Built with Bun and browser APIs. No runtime dependencies.
 
-Voice fades over 320 world pixels outside shared rooms. Everyone inside the same
-marked room hears each other at full volume, regardless of distance. Leaving the
-room restores proximity volume. Room boundaries follow the five labeled floor zones.
+## Run locally
 
-Choose an outfit color and a scarf or satchel in the lobby. Appearance is saved
-locally and synchronized to other players when joining. Walking animates arms and
-legs independently, turns left/right and eases to a stop. Reduced-motion settings
-disable the decorative animation.
+Install [Bun](https://bun.sh), then:
 
-`/proposals/screen-share.html` is an interactive screen-sharing design proposal;
-its simulated controls do not capture or transmit a real screen.
-
-## screen sharing
-
-Use **share screen** inside the office, then choose a tab, window or display in
-the browser picker. The presentation appears beside the map and can be expanded;
-camera and microphone continue on their existing connection. This version shares
-screen video without system audio, targeting 720p at 15 fps.
-
-Each marked room allows one presenter. Outside rooms, presentations are visible
-to nearby people within 320 pixels who are also outside rooms. The server limits
-signaling and updates the audience as people move; screen connections close when
-viewers leave that audience. Changing rooms, leaving the office, disconnecting,
-or stopping capture in the browser ends your presentation.
-
-Screen capture requires HTTPS and browser support. Viewers can watch even if their
-browser cannot capture. The existing mesh sends a separate screen copy to each
-viewer and reuses the configured TURN servers.
-
-World is 2400x1600 with camera follow + minimap. Zones: lobby, open office (desks),
-meeting room, lounge, kitchen. Walls and furniture collide.
-
-## run
-
-```bash
-bun --cwd /home/genesis/workspace/pixel-office dev
-# open http://localhost:3000
+```sh
+git clone https://github.com/gengue/pixel-office.git
+cd pixel-office
+bun run dev
 ```
 
-Open 2 tabs, pick different bodies, allow camera + mic on entry, walk close to talk.
-Chat: paste `https://example.com`, it opens in a new tab. Bubbles clamp to 72px with ellipsis, click to expand.
+Open `http://localhost:3000` in two tabs and allow camera and microphone access.
+Other devices need HTTPS for camera, microphone and screen capture.
 
-## stack
+## In the office
 
-Bun.serve + native WebSocket (signaling + positions + chat). Mesh P2P WebRTC for audio/video between nearby peers only. Zero deps.
+- Move with WASD, arrow keys or a click. Press **E** near a chair or sofa to sit;
+  move or press E again to stand.
+- Choose your body, outfit and accessory before joining. Your appearance is saved
+  on your device. Your live webcam remains your avatar's face.
+- Walk near someone to talk. Voice fades over 320 world pixels; people inside the
+  same marked room hear each other at full volume, regardless of distance.
+- Use the bottom controls to mute, react, raise your hand, share a screen or leave.
+  Reactions float above avatars; presentations also show temporary named notices.
+- Share a tab, window or display beside the office, or expand the presentation.
+  Camera and microphone stay connected. Leaving the room ends your presentation.
+- Chat messages go to the whole office. Reactions reach people in voice range or
+  the same room and disappear after three seconds.
 
-## production
+Each room allows one presenter. Outside rooms, screen sharing reaches nearby people
+who are also outside rooms. Screen capture targets 720p at 15 fps without system audio.
 
-```bash
+## TURN configuration
+
+STUN works by default, but connections across restrictive networks require TURN.
+Copy `.env.example` to `.env` and configure one provider:
+
+- Cloudflare: `CLOUDFLARE_TURN_KEY_ID` and `CLOUDFLARE_TURN_API_TOKEN` are a TURN key
+  ID and secret, **not** the account management API token. Only the server uses the
+  secret; browsers receive temporary ICE credentials.
+- Another TURN provider: set comma-separated `TURN_URLS`, `TURN_USERNAME` and
+  `TURN_CREDENTIAL`. These credentials are delivered to browsers.
+
+`GET /rtc-config` returns the ICE configuration. A configured provider failure
+returns 503. Restart the server after changing configuration.
+
+## Production
+
+```sh
 bun run build
-HOST=127.0.0.1 PORT=3108 bun run start:prod
+HOST=127.0.0.1 PORT=3000 bun run start:prod
 ```
 
-The build bundles/minifies the browser JavaScript, CSS and Bun server into
-`dist/`, including the HTML and image assets. The production server serves only
-the built files, without hot reload.
+Serve it behind an HTTPS reverse proxy with WebSocket support. The build bundles
+browser code, CSS, the server and public assets into `dist/`.
 
-On workbox, `pixel-office-production.service` is an enabled user systemd service.
-After rebuilding, restart it with `systemctl --user restart pixel-office-production`.
-Logs: `journalctl --user -u pixel-office-production -f`.
+## Checks
 
-Public test URL: https://workbox.bengal-balance.ts.net:8443/ (Tailscale Funnel;
-visitors do not need Tailscale). Disable public access with
-`tailscale funnel --https=8443 off`.
+```sh
+bun test
+```
 
-## office artwork
+Tests cover artwork bounds, seats, avatar validation, voice range, early ICE
+candidates, screen audience enforcement, reaction validation and viewer lifecycle.
 
-`public/assets/office-atlas.png` and `office-variety.png` are original AI-generated
-transparent furniture atlases, including five plant species and varied seating.
-`public/office-art.js` contains measured sprite regions, a cached floor layer and the
-minimap. Furniture and avatars are painted in depth order. Layout and collision
-footprints remain in `public/app.js`; keep those footprints aligned when moving props.
-The original renderer remains available while the atlas loads or if it cannot load.
+## Structure
 
-`public/seating.js` defines usable seats for chairs, armchairs and both sofa cushions.
-Approach a seat and press E or use the on-screen button. Press E, move, or click
-the floor to stand up at the previous safe position. Nearby occupied seats are
-excluded by the client; simultaneous seat claims are not server-arbitrated.
+- `server.ts`: in-memory players, WebSocket events, presentation audiences and static files.
+- `rtc-config.ts`: server-side TURN credential exchange.
+- `public/app.js`: office layout, movement, rendering, chat and camera connections.
+- `public/screen-share.js`: display capture and separate presentation connections.
+- `public/office-art.js`, `avatars.js`, `seating.js`: artwork, bodies and usable seats.
+- `public/rooms.js`, `voice.js`, `reactions.js`: shared room and interaction rules.
 
-Run the atlas and seating checks with `bun test`.
+The two furniture atlases are original AI-generated assets. The basic renderer
+keeps the office usable while images load or if they fail. Reduced-motion settings
+suppress decorative animation.
 
-## experiment limits
+## Limits
 
-- No persistence, no auth, single room.
-- Public Google STUN by default. Configure TURN for networks that cannot connect directly; chat and movement do not need it.
-- 320p video to save bandwidth.
+This is an experiment: one shared office, no accounts, access control or persistence.
+Anyone with the deployment URL can join; chat and positions are public to that office.
+The TURN configuration endpoint is also public, so operate it with provider quotas.
 
-## voice/video across networks
-
-Set `CLOUDFLARE_TURN_KEY_ID` and `CLOUDFLARE_TURN_API_TOKEN` on the server
-to use Cloudflare TURN. These are the TURN key ID and its secret, not the account
-management API token. The server exchanges them for temporary browser credentials.
-Alternatively, set `TURN_URLS` (comma-separated), `TURN_USERNAME`, and
-`TURN_CREDENTIAL` for an existing TURN service; those credentials are sent to clients.
-Restart the production service after configuring its environment.
-
-`GET /rtc-config` supplies the browser ICE configuration. A configured provider
-failure returns 503 rather than silently disabling relay support.
-
-Reactions: use the reactions button for six temporary emojis, visible above your avatar to people in voice range or the same room. During screen sharing, named reaction notices also appear with the presentation, including expanded view. Reactions are limited to one per 650 ms and are not saved in chat.
+WebRTC uses a peer mesh, including one screen stream per viewer. It is intended for
+small groups. Seats avoid occupied positions on the client but simultaneous claims
+are not arbitrated by the server. Camera capture targets 320×240 to limit bandwidth.

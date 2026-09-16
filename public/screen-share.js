@@ -49,8 +49,8 @@ export function setupScreenShare({ send, getConfig, getMe, getPeers, isConnected
     if (!share) main.classList.remove('screen-expanded')
     $('expandScreen').textContent = main.classList.contains('screen-expanded') ? 'Show office' : 'Expand'
     $('expandScreen').setAttribute('aria-pressed', String(main.classList.contains('screen-expanded')))
-    $('stopScreen').hidden = !local
-    $('shareBtn').textContent = local ? 'stop sharing' : capturing ? 'choosing screen…' : 'share screen'
+    $('shareBtn').textContent = local ? 'Stop sharing' : capturing ? 'Choosing…' : 'Share screen'
+    $('shareBtn').setAttribute('aria-pressed', String(!!local))
     const busy = shares.some((s) => s.owner !== getMe().id && s.room !== -1 && s.room === roomAt(getMe()))
     $('shareBtn').disabled = !supported || capturing || (!local && (busy || !isConnected()))
     $('shareBtn').title = !supported ? 'This browser cannot share a screen. You can still watch others.' : busy ? 'Someone is presenting in this room.' : 'Choose a tab, window or screen'
@@ -61,7 +61,7 @@ export function setupScreenShare({ send, getConfig, getMe, getPeers, isConnected
     $('screenTitle').textContent = own ? 'Your screen' : `${ownerOf(share)?.name ?? 'Someone'} is presenting`
     const scope = share.room === -1 ? 'Nearby people outside rooms' : ROOMS[share.room].label
     $('screenAudience').textContent = own ? `${scope} · ${viewers.length} viewer${viewers.length === 1 ? '' : 's'}` : scope
-    $('screenHint').textContent = own ? 'Sharing stops when you change rooms. Your camera and microphone stay on.' : 'Your camera and microphone stay on while you watch.'
+    $('screenHint').textContent = own ? 'Leaving this room ends your presentation.' : ''
     $('screenWaiting').hidden = !!stream && $('screenVideo').readyState >= 2
   }
 
@@ -218,7 +218,6 @@ export function setupScreenShare({ send, getConfig, getMe, getPeers, isConnected
   }
 
   $('shareBtn').onclick = () => local ? stop() : void start()
-  $('stopScreen').onclick = () => stop()
   $('screenChoice').onchange = () => { selected = $('screenChoice').value; render() }
   $('screenVideo').onloadeddata = () => { $('screenWaiting').hidden = true }
   $('expandScreen').onclick = () => { main.classList.toggle('screen-expanded'); render() }

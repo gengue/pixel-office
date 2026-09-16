@@ -54,6 +54,13 @@ final result: passed
 
 ## Reactions verification
 
-- Server integration: emoji allowlist, authenticated sender identity, 650 ms rate limit, same-room delivery across distance, nearby delivery and distant exclusion.
+- Server integration: emoji allowlist, server-assigned sender identity, 650 ms rate limit, same-room delivery across distance, nearby delivery and distant exclusion.
 - Production Chromium: avatar reaction and automatic expiry; keyboard Space sends and Escape dismisses the native picker; presenter and expanded viewer receive named notices; 390 px layout fits and reduced-motion rendering works.
 - Screen sharing regression passed with forced TURN relay and decoded frames; camera track remained unchanged.
+
+## Bottom controls review
+
+- Call controls stay in the same bottom position in office and expanded presentation views.
+- Picker opens immediately above React; 1440, 390 and 320 px layouts fit without horizontal overflow.
+- Microphone and raised-hand state are conveyed by labels and aria-pressed, with distinct styling.
+- Removed the duplicate stop-sharing action and repeated presentation copy; content reserves the measured dock height.

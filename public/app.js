@@ -289,7 +289,7 @@ function enterStage() {
     $('lobby').hidden = true
   }, 300)
   $('stage').hidden = false
-  $('meLabel').textContent = `${me.name} · ${BODIES[me.body].label}`
+  $('meLabel').textContent = me.name
   refreshRoster()
 }
 
@@ -377,6 +377,20 @@ function upsertPeer(p) {
 
 const send = (o) => ws?.readyState === 1 && ws.send(JSON.stringify(o))
 
+function positionReactions() {
+  const picker = $('reactionPicker')
+  if (!picker.matches(':popover-open')) return
+  const button = $('reactionBtn').getBoundingClientRect()
+  picker.style.left = `${Math.max(12, Math.min(innerWidth - picker.offsetWidth - 12, button.left + button.width / 2 - picker.offsetWidth / 2))}px`
+  picker.style.top = `${button.top - picker.offsetHeight - 14}px`
+}
+$('reactionPicker').addEventListener('toggle', positionReactions)
+addEventListener('resize', positionReactions)
+new ResizeObserver(() => {
+  document.documentElement.style.setProperty('--dock-height', `${$('callDock').offsetHeight}px`)
+  positionReactions()
+}).observe($('callDock'))
+
 let lastReaction = 0
 for (const [emoji, label] of Object.entries(REACTIONS)) {
   const button = document.createElement('button')
@@ -422,7 +436,7 @@ const screenShare = setupScreenShare({
 })
 
 function ensurePC(pid) {
-  if (pcs.has(pid) || !localStream || !myId) return pcs.get(pid)
+  if (pcs.has(pid) || !localStream || !myId || !peers.has(pid)) return pcs.get(pid)
   const pc = new RTCPeerConnection(rtcCfg)
   pcs.set(pid, pc)
   for (const tr of localStream.getTracks()) pc.addTrack(tr, localStream)
@@ -461,7 +475,7 @@ async function maybeCall(pid) {
 }
 
 async function onSignal(from, d) {
-  if (from === myId || !localStream) return
+  if (from === myId || !localStream || !peers.has(from)) return
   if (d.kind === 'offer') {
     const pc = ensurePC(from)
     if (!pc) return
@@ -576,29 +590,22 @@ $('joinBtn').onclick = async () => {
   if (!localStream) {
     setStatus('asking for camera and microphone…', true)
     try {
-      const gumTimeout = new Promise((_, rej) => setTimeout(() => rej(new Error('cam-timeout')), 15000))
-      localStream = await Promise.race([
-        navigator.mediaDevices.getUserMedia({
-          video: { width: { ideal: 320 }, height: { ideal: 240 } },
-          audio: { echoCancellation: true, noiseSuppression: true },
-        }),
-        gumTimeout,
-      ])
+      localStream = await navigator.mediaDevices.getUserMedia({
+        video: { width: { ideal: 320 }, height: { ideal: 240 } },
+        audio: { echoCancellation: true, noiseSuppression: true },
+      })
       $('selfVideo').srcObject = localStream
       // never hang on play(): some browsers stall it, video starts when it can
       await Promise.race([$('selfVideo').play().catch(() => {}), new Promise((r) => setTimeout(r, 4000))])
     } catch (e) {
       const denied = e?.name === 'NotAllowedError' || e?.name === 'SecurityError'
       const missing = e?.name === 'NotFoundError' || e?.name === 'OverconstrainedError'
-      const timeout = e?.message === 'cam-timeout'
       failJoin(
         denied
           ? 'Permission denied: allow camera and microphone in the browser (lock icon in the address bar) and try again.'
           : missing
             ? 'No camera or microphone found. Plug in a device and try again.'
-            : timeout
-              ? 'Camera/microphone is taking too long to respond. Try again.'
-              : 'Could not start camera/microphone. Check the browser and try again.'
+            : 'Could not start camera/microphone. Check the browser and try again.'
       )
       return
     }
@@ -637,12 +644,16 @@ $('sitBtn').onclick = toggleSit
 $('handBtn').onclick = (e) => {
   me.hand = !me.hand
   send({ t: 'hand', hand: me.hand })
-  e.target.textContent = me.hand ? 'lower hand' : 'raise hand'
+  e.currentTarget.textContent = me.hand ? 'Lower hand' : 'Raise hand'
+  e.currentTarget.setAttribute('aria-pressed', String(me.hand))
+  e.currentTarget.title = me.hand ? 'Lower hand' : 'Raise hand'
 }
 $('muteBtn').onclick = (e) => {
   muted = !muted
   localStream?.getAudioTracks().forEach((t) => (t.enabled = !muted))
-  e.target.textContent = muted ? 'unmute' : 'mute'
+  e.currentTarget.textContent = muted ? 'Mic off' : 'Mic on'
+  e.currentTarget.setAttribute('aria-pressed', String(muted))
+  e.currentTarget.title = muted ? 'Unmute microphone' : 'Mute microphone'
 }
 $('chatForm').onsubmit = (e) => {
   e.preventDefault()
