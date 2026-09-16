@@ -1,7 +1,11 @@
-import { BODIES, BODY_KINDS, drawBody, renderPreview } from './avatars.js'
+import { BODIES, BODY_KINDS, OUTFIT_COLORS, ACCESSORIES, normalizeAppearance, drawBody, renderPreview } from './avatars.js'
 import { createOfficeArt } from './office-art.js'
 import { createSeats, findSeat } from './seating.js'
 import { addRemoteIce, setRemoteDescription } from './rtc.js'
+import { LINK, voiceVolume } from './voice.js'
+import { ROOMS as floors } from './rooms.js'
+import { REACTIONS } from './reactions.js'
+import { setupScreenShare } from './screen-share.js'
 
 const WORLD = { w: 2400, h: 1600 }
 const VIEW = { w: 960, h: 600 }
@@ -19,13 +23,6 @@ function hitsSolid(px, py, r) {
 }
 
 // ---------- office layout ----------
-const floors = [
-  { x: 40, y: 40, w: 580, h: 380, c: '#d9d4c1', label: 'WELCOME LOUNGE', lx: 330, ly: 340 },
-  { x: 680, y: 60, w: 1040, h: 820, c: '#a8bbb2', label: 'THE STUDIO', lx: 1200, ly: 440 },
-  { x: 1800, y: 80, w: 540, h: 460, c: '#b9b3c9', label: 'MEETING ROOM', lx: 2070, ly: 162 },
-  { x: 60, y: 1000, w: 600, h: 540, c: '#b9c4a6', label: 'THE READING ROOM', lx: 360, ly: 1052 },
-  { x: 1700, y: 1020, w: 650, h: 520, c: '#d5ddca', label: 'COFFEE & COMPANY', lx: 2090, ly: 1078 },
-]
 const walls = [
   [0, 0, 2400, 24], [0, 1576, 2400, 24], [0, 0, 24, 1600], [2376, 0, 24, 1600],
   [24, 24, 1756, 100],
@@ -83,8 +80,6 @@ for (const [t, x, y, w, h] of furn) {
     solid(x, y, t === 'desk' ? 150 : w, t === 'desk' ? 70 : h)
   }
 }
-const TALK = 220
-const LINK = 330
 const SPEED = 210
 const HEAD_ZOOM = 1.45 // face crop: higher = tighter on face, less background
 
@@ -121,6 +116,8 @@ const store = {
   },
 }
 let picked = 'hombre'
+let appearance = normalizeAppearance(store.get()?.appearance)
+const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)')
 {
   const saved = store.get()
   if (BODY_KINDS.includes(saved.body)) picked = saved.body
@@ -128,26 +125,51 @@ let picked = 'hombre'
     $('name').value = saved.name.slice(0, 24)
   }
 }
-const saveProfile = () => store.set({ name: $('name').value.trim(), body: picked })
+const saveProfile = () => store.set({ name: $('name').value.trim(), body: picked, appearance })
 $('name').addEventListener('input', saveProfile)
 const bodiesEl = $('bodies')
 for (const kind of BODY_KINDS) {
   const b = document.createElement('button')
   b.type = 'button'
   b.className = 'bodyOpt' + (kind === picked ? ' sel' : '')
+  b.dataset.kind = kind
+  b.setAttribute('aria-pressed', String(kind === picked))
   const c = document.createElement('canvas')
-  renderPreview(c, kind)
+  renderPreview(c, kind, appearance)
   const s = document.createElement('span')
   s.textContent = BODIES[kind].label
   b.append(c, s)
   b.onclick = () => {
     picked = kind
-    bodiesEl.querySelectorAll('.bodyOpt').forEach((el) => el.classList.remove('sel'))
-    b.classList.add('sel')
+    for (const el of bodiesEl.children) {
+      el.classList.toggle('sel', el === b)
+      el.setAttribute('aria-pressed', String(el === b))
+      renderPreview(el.querySelector('canvas'), el.dataset.kind, appearance)
+    }
     saveProfile()
   }
   bodiesEl.append(b)
 }
+const refreshAppearance = () => {
+  for (const el of bodiesEl.children) renderPreview(el.querySelector('canvas'), el.dataset.kind, appearance)
+  for (const el of $('outfitColors').children) el.setAttribute('aria-pressed', String(el.dataset.color === appearance.color))
+  saveProfile()
+}
+for (const [color, outfit] of Object.entries(OUTFIT_COLORS)) {
+  const button = document.createElement('button')
+  button.type = 'button'
+  button.className = 'swatch'
+  button.dataset.color = color
+  button.title = outfit.label
+  button.setAttribute('aria-label', outfit.label)
+  button.setAttribute('aria-pressed', String(color === appearance.color))
+  button.style.background = outfit.C ?? 'linear-gradient(135deg, #568fae 50%, #c87985 50%)'
+  button.onclick = () => { appearance.color = color; refreshAppearance() }
+  $('outfitColors').append(button)
+}
+for (const [value, label] of Object.entries(ACCESSORIES)) $('accessory').add(new Option(label, value))
+$('accessory').value = appearance.accessory
+$('accessory').onchange = () => { appearance.accessory = $('accessory').value; refreshAppearance() }
 
 let localStream = null
 
@@ -157,7 +179,7 @@ let myId = null
 const tabId =
   sessionStorage.getItem('po-tab') ?? crypto.randomUUID?.() ?? String(Math.random())
 sessionStorage.setItem('po-tab', tabId)
-const me = { name: 'anon', body: picked, country: '', hand: false, sitting: false, x: 120, y: 360, tx: null, ty: null, walk: 0, moving: false }
+const me = { name: 'anon', body: picked, appearance, country: '', hand: false, sitting: false, x: 120, y: 360, tx: null, ty: null, walk: 0, moving: false, motion: 0, facing: 1 }
 const peers = new Map() // id -> {id,name,body,x,y,walk,moving,videoEl}
 window.__po = { me, cam, peers, WORLD, VIEW }
 const pcs = new Map() // id -> RTCPeerConnection
@@ -279,16 +301,18 @@ function connect() {
   ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`)
   ws.onopen = () => {
     setStatus('joining…', true)
-    send({ t: 'join', tab: tabId, name: me.name, body: me.body, country: me.country, x: me.x, y: me.y })
+    send({ t: 'join', tab: tabId, name: me.name, body: me.body, appearance: me.appearance, country: me.country, x: me.x, y: me.y })
   }
   ws.onerror = () => failJoin('Could not reach the server. Check your connection and try again.')
   ws.onclose = () => {
+    screenShare.reset()
     if (!$('stage').hidden && !myId) failJoin('Connection lost before entering. Try again.')
   }
   ws.onmessage = (ev) => {
     const m = JSON.parse(ev.data)
     if (m.t === 'welcome') {
       myId = m.id
+      me.id = myId
       setStatus('')
       for (const p of m.roster) if (p.id !== myId) upsertPeer(p)
       enterStage()
@@ -333,24 +357,69 @@ function connect() {
     } else if (m.t === 'chat') {
       addHistory(m.name, m.text, m.at)
       addBubble(m.id, m.text)
+    } else if (m.t === 'reaction') {
+      showReaction(m)
     } else if (m.t === 'signal') {
       onSignal(m.from, m.data).catch((error) => {
         console.warn('Call negotiation failed:', error.name)
         closePC(m.from)
       })
+    } else if (['share-state', 'share-error', 'screen-signal'].includes(m.t)) {
+      void screenShare.onMessage(m)
     }
   }
 }
 
 function upsertPeer(p) {
-  if (!peers.has(p.id)) peers.set(p.id, { ...p, tx: p.x, ty: p.y, walk: 0, moving: false, videoEl: null })
-  else Object.assign(peers.get(p.id), { name: p.name, body: p.body, country: p.country ?? '', hand: !!p.hand, sitting: !!p.sitting })
+  if (!peers.has(p.id)) peers.set(p.id, { ...p, appearance: normalizeAppearance(p.appearance), tx: p.x, ty: p.y, walk: 0, moving: false, motion: 0, facing: 1, videoEl: null })
+  else Object.assign(peers.get(p.id), { name: p.name, body: p.body, appearance: normalizeAppearance(p.appearance), country: p.country ?? '', hand: !!p.hand, sitting: !!p.sitting })
 }
 
 const send = (o) => ws?.readyState === 1 && ws.send(JSON.stringify(o))
 
+let lastReaction = 0
+for (const [emoji, label] of Object.entries(REACTIONS)) {
+  const button = document.createElement('button')
+  button.type = 'button'
+  button.textContent = emoji
+  button.setAttribute('aria-label', label)
+  button.title = label
+  button.onclick = () => {
+    if (Date.now() - lastReaction < 650) return
+    lastReaction = Date.now()
+    send({ t: 'reaction', emoji })
+  }
+  $('reactionChoices').append(button)
+}
+function showReaction({ id, name, emoji }) {
+  if (!Object.hasOwn(REACTIONS, emoji)) return
+  const key = `reaction-${id}`
+  bubbles.get(key)?.el.remove()
+  const el = document.createElement('div')
+  el.className = 'avatarReaction'
+  el.textContent = emoji
+  el.setAttribute('aria-hidden', 'true')
+  $('bubbles').append(el)
+  bubbles.set(key, { el, pid: id })
+  const chip = document.createElement('div')
+  chip.className = 'reactionChip'
+  chip.textContent = `${emoji} ${name}`
+  const feed = $('reactionFeed')
+  if (feed.children.length >= 4) feed.firstElementChild.remove()
+  feed.append(chip)
+  setTimeout(() => {
+    el.remove()
+    chip.remove()
+    if (bubbles.get(key)?.el === el) bubbles.delete(key)
+  }, 3000)
+}
+
 // ---------- WebRTC mesh gated by proximity ----------
 let rtcCfg = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] }
+const screenShare = setupScreenShare({
+  send, getConfig: () => rtcCfg, getMe: () => me, getPeers: () => peers,
+  isConnected: () => ws?.readyState === 1 && !!myId && !$('stage').hidden,
+})
 
 function ensurePC(pid) {
   if (pcs.has(pid) || !localStream || !myId) return pcs.get(pid)
@@ -420,6 +489,7 @@ function attachRemote(pid, stream) {
     p.videoEl = v
   }
   p.videoEl.srcObject = stream
+  p.videoEl.volume = voiceVolume(me, p, floors)
   p.videoEl.play().catch(() => {})
 }
 
@@ -427,9 +497,8 @@ setInterval(() => {
   if (!myId) return
   for (const [id, p] of peers) {
     const d = dist(me, p)
-    if (d < LINK && localStream) {
+    if ((d < LINK || voiceVolume(me, p, floors) > 0) && localStream) {
       if (!pcs.has(id)) maybeCall(id).catch(() => closePC(id))
-      if (p.videoEl) p.videoEl.volume = Math.max(0, 1 - d / TALK)
     } else if (d > LINK + 90) {
       closePC(id)
     }
@@ -470,7 +539,8 @@ function toggleSit() {
 // ---------- input ----------
 addEventListener('keydown', (e) => {
   if ($('stage').hidden) return
-  if (document.activeElement === $('chatInput')) return
+  if (document.activeElement?.matches('input, textarea, select') || document.activeElement?.closest('#reactionPicker')) return
+  if (document.activeElement?.matches('button') && [' ', 'Enter'].includes(e.key)) return
   if (e.key.toLowerCase() === 'e') {
     e.preventDefault()
     if (!e.repeat) toggleSit()
@@ -556,12 +626,13 @@ $('joinBtn').onclick = async () => {
 
 // tab close -> explicit close frame, server drops peer instantly
 addEventListener('beforeunload', () => {
+  screenShare.reset()
   try {
     ws?.close()
   } catch {}
 })
 
-$('leaveBtn').onclick = () => location.reload()
+$('leaveBtn').onclick = () => { screenShare.reset(); location.reload() }
 $('sitBtn').onclick = toggleSit
 $('handBtn').onclick = (e) => {
   me.hand = !me.hand
@@ -825,7 +896,7 @@ function drawHead(x, y, r, videoEl, initials) {
 
 const initialsOf = (n) => n.slice(0, 2).toUpperCase()
 
-function drawAvatar(p, videoEl, isMe, inCall) {
+function drawAvatar(p, videoEl, isMe, inCall, now) {
   const s = 4
   const bw = 12 * s
   const headR = 22
@@ -843,7 +914,10 @@ function drawAvatar(p, videoEl, isMe, inCall) {
     ctx.arc(cx, bodyY + 10, 52, 0, 7)
     ctx.stroke()
   }
-  drawBody(ctx, p.body, cx - bw / 2, bodyY, s, p.walk, p.sitting)
+  drawBody(ctx, p.body, cx - bw / 2, bodyY, s, p.walk, p.sitting, {
+    appearance: p.appearance, facing: p.facing, motion: reducedMotion.matches ? 0 : p.motion,
+    time: reducedMotion.matches ? 0 : now / 1000,
+  })
   drawHead(cx, bodyY - headR + 6, headR, videoEl, initialsOf(p.name || '?'))
   // nametag
   ctx.font = 'bold 12px system-ui'
@@ -872,7 +946,13 @@ let lastSent = 0
 function tick(now) {
   const dt = Math.min(0.05, (now - last) / 1000)
   last = now
+  if (!$('lobby').hidden) {
+    const selected = bodiesEl.querySelector('.sel canvas')
+    renderPreview(selected, picked, appearance, reducedMotion.matches ? 0 : now / 1000, !reducedMotion.matches)
+  }
   if (! $('stage').hidden) {
+    const oldX = me.x
+    const oldY = me.y
     // movement (axis-separated vs solids = slides along walls)
     const step = (dx, dy) => {
       if (dx && !hitsSolid(me.x + dx, me.y, BODY_R)) me.x += dx
@@ -904,7 +984,9 @@ function tick(now) {
     }
     me.x = Math.max(30, Math.min(WORLD.w - 30, me.x))
     me.y = Math.max(40, Math.min(WORLD.h - 30, me.y))
-    if (me.moving) me.walk += dt * 10
+    screenShare.update()
+    me.moving = !me.sitting && Math.hypot(me.x - oldX, me.y - oldY) > 0.01
+    if (Math.abs(me.x - oldX) > 0.01) me.facing = Math.sign(me.x - oldX)
     // camera follows avatar
     const tx = Math.max(0, Math.min(WORLD.w - VIEW.w, me.x - VIEW.w / 2))
     const ty = Math.max(0, Math.min(WORLD.h - VIEW.h, me.y - VIEW.h / 2))
@@ -924,9 +1006,13 @@ function tick(now) {
           p.x += dx * Math.min(1, dt * 10)
           p.y += dy * Math.min(1, dt * 10)
           p.moving = d > 3
-          if (p.moving) p.walk += dt * 10
+          if (Math.abs(dx) > 1) p.facing = Math.sign(dx)
         } else p.moving = false
       }
+    }
+    for (const p of [me, ...peers.values()]) {
+      p.motion += ((p.moving && !p.sitting ? 1 : 0) - p.motion) * Math.min(1, dt * 12)
+      p.walk += dt * 10 * p.motion
     }
     // render (world coords under camera transform)
     ctx.save()
@@ -938,7 +1024,9 @@ function tick(now) {
     all.sort((a, b) => a.y - b.y)
     const inCall = new Set()
     for (const p of peers.values()) {
-      if (dist(me, p) < TALK && pcs.get(p.id)?.connectionState === 'connected' && p.videoEl?.readyState >= 2) inCall.add(p.id)
+      const volume = voiceVolume(me, p, floors)
+      if (p.videoEl) p.videoEl.volume = volume
+      if (volume > 0 && pcs.get(p.id)?.connectionState === 'connected' && p.videoEl?.readyState >= 2) inCall.add(p.id)
     }
     // Paint furniture and people in depth order so walking behind a desk feels natural.
     const scene = officeArt.ready
@@ -946,7 +1034,7 @@ function tick(now) {
       : all.map((avatar) => ({ avatar }))
     for (const { object, avatar } of scene) {
       if (object) officeArt.draw(ctx, object)
-      else drawAvatar(avatar, avatar.video, avatar.isMe, avatar.isMe ? inCall.size > 0 : inCall.has(avatar.id))
+      else drawAvatar(avatar, avatar.video, avatar.isMe, avatar.isMe ? inCall.size > 0 : inCall.has(avatar.id), now)
     }
     ctx.restore()
     drawMini(all)
@@ -968,7 +1056,7 @@ function tick(now) {
       pill.textContent = `in call · ${inCall.size}`
       pill.classList.add('on')
     } else {
-      pill.textContent = [...peers.values()].some((p) => dist(me, p) < TALK) ? 'connecting audio/video…' : 'not in call'
+      pill.textContent = [...peers.values()].some((p) => voiceVolume(me, p, floors) > 0) ? 'connecting audio/video…' : 'not in call'
       pill.classList.remove('on')
     }
   }
@@ -997,7 +1085,7 @@ function refreshRoster() {
   }
   for (const p of rows) {
     const li = document.createElement('li')
-    const near = p.self ? false : dist(me, p) < TALK
+    const near = p.self ? false : voiceVolume(me, p, floors) > 0
     li.innerHTML = `<span><i class="dot${near ? ' talk' : ''}"></i></span><span class="kind"></span>`
     li.firstChild.append(document.createTextNode(`${p.sitting ? '🪑 ' : ''}${p.hand ? '✋ ' : ''}${flag(p.country)} ${p.name}`.trim()))
     li.querySelector('.kind').textContent = p.self ? BODIES[me.body].label : BODIES[p.body]?.label ?? p.body

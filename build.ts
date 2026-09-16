@@ -13,4 +13,5 @@ for (const result of results) {
 await mkdir('dist/public', { recursive: true })
 await cp('public/index.html', 'dist/public/index.html')
 await cp('public/assets', 'dist/public/assets', { recursive: true })
+await cp('public/proposals', 'dist/public/proposals', { recursive: true })
 console.log('Production build ready in dist/')

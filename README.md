@@ -3,6 +3,35 @@
 Pixel avatars (man, woman, orc, lizard, robot, ghost) + your live webcam as the head.
 Move with WASD/arrows or click. Proximity voice over WebRTC (walk up to talk). Chat with links + bubbles.
 
+Voice fades over 320 world pixels outside shared rooms. Everyone inside the same
+marked room hears each other at full volume, regardless of distance. Leaving the
+room restores proximity volume. Room boundaries follow the five labeled floor zones.
+
+Choose an outfit color and a scarf or satchel in the lobby. Appearance is saved
+locally and synchronized to other players when joining. Walking animates arms and
+legs independently, turns left/right and eases to a stop. Reduced-motion settings
+disable the decorative animation.
+
+`/proposals/screen-share.html` is an interactive screen-sharing design proposal;
+its simulated controls do not capture or transmit a real screen.
+
+## screen sharing
+
+Use **share screen** inside the office, then choose a tab, window or display in
+the browser picker. The presentation appears beside the map and can be expanded;
+camera and microphone continue on their existing connection. This version shares
+screen video without system audio, targeting 720p at 15 fps.
+
+Each marked room allows one presenter. Outside rooms, presentations are visible
+to nearby people within 320 pixels who are also outside rooms. The server limits
+signaling and updates the audience as people move; screen connections close when
+viewers leave that audience. Changing rooms, leaving the office, disconnecting,
+or stopping capture in the browser ends your presentation.
+
+Screen capture requires HTTPS and browser support. Viewers can watch even if their
+browser cannot capture. The existing mesh sends a separate screen copy to each
+viewer and reuses the configured TURN servers.
+
 World is 2400x1600 with camera follow + minimap. Zones: lobby, open office (desks),
 meeting room, lounge, kitchen. Walls and furniture collide.
 
@@ -72,3 +101,5 @@ Restart the production service after configuring its environment.
 
 `GET /rtc-config` supplies the browser ICE configuration. A configured provider
 failure returns 503 rather than silently disabling relay support.
+
+Reactions: use the reactions button for six temporary emojis, visible above your avatar to people in voice range or the same room. During screen sharing, named reaction notices also appear with the presentation, including expanded view. Reactions are limited to one per 650 ms and are not saved in chat.

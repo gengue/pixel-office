@@ -18,6 +18,13 @@
     <div class="field">Pixel body
       <div id="bodies" class="bodies"></div>
     </div>
+    <fieldset class="avatarStyle">
+      <legend>Make it yours</legend>
+      <div id="outfitColors" class="swatches" role="group" aria-label="Outfit color"></div>
+      <label class="field" for="accessory">Accessory</label>
+      <select id="accessory"></select>
+      <p class="hint">Your look is saved on this device and visible to everyone in the office.</p>
+    </fieldset>
     <div class="row">
       <button id="joinBtn" type="button">enter office →</button>
     </div>
@@ -34,9 +41,13 @@
     <span id="callLabel" class="pill">not in call</span>
     <span class="spacer"></span>
     <span id="count"></span>
+    <button id="shareBtn" class="ghost sm" type="button">share screen</button>
+    <button id="reactionBtn" class="ghost sm" type="button" popovertarget="reactionPicker">☺ reactions</button>
+    <div id="reactionPicker" popover aria-label="Choose a reaction"><div id="reactionChoices" role="group" aria-label="Reactions"></div></div>
     <button id="handBtn" class="ghost sm" type="button">raise hand</button>
     <button id="muteBtn" class="ghost sm" type="button">mute</button>
     <button id="leaveBtn" class="ghost sm" type="button">leave</button>
+    <span id="shareStatus" role="status" aria-live="polite"></span>
   </header>
   <main>
     <div id="canvasWrap">
@@ -46,6 +57,20 @@
       <button id="sitBtn" type="button" hidden>E · Sit down</button>
     </div>
     <aside>
+      <section id="screenPanel" hidden aria-label="Screen sharing">
+        <div class="screenToolbar">
+          <h2 id="screenTitle">Shared screen</h2>
+          <button id="expandScreen" class="ghost sm" type="button" aria-pressed="false">Expand</button>
+        </div>
+        <p id="screenAudience"></p>
+        <select id="screenChoice" aria-label="Choose a presentation" hidden></select>
+        <div class="screenContent">
+          <video id="screenVideo" autoplay playsinline muted controls></video>
+          <p id="screenWaiting">Connecting to the shared screen…</p>
+        </div>
+        <p id="screenHint" class="hint"></p>
+        <button id="stopScreen" type="button" hidden>Stop sharing</button>
+      </section>
       <h2>messages</h2>
       <div id="flagBar" title="countries in the office"></div>
       <div id="history"></div>
@@ -59,6 +84,7 @@
   </main>
 </div>
 
+<div id="reactionFeed" role="status" aria-live="polite" aria-relevant="additions" aria-label="Live reactions"></div>
 <video id="selfVideo" muted playsinline hidden></video>
 <div id="remoteMedia" hidden></div>
 <script type="module" src="/app.js"></script>

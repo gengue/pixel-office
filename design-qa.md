@@ -40,3 +40,20 @@ user devices still require user verification. Existing avatars retain their
 original simpler art style.
 
 final result: passed
+
+## Screen sharing verification
+
+- Native Chromium display capture with synthetic devices delivered decoded screen
+  video over a selected TURN relay candidate while preserving the camera track.
+- Verified separate-room exclusion, audience removal closing the sender connection,
+  re-entry, expand/restore, manual stop, picker cancellation, browser track-ended
+  handling, automatic stop on room exit, and a 390px layout without overflow.
+- Server regression covers room exclusivity, unauthorized signaling, room exit,
+  proximity audience and presenter disconnect. UI regression covers an empty
+  initial state and crossing back over a boundary before a server audience update.
+
+## Reactions verification
+
+- Server integration: emoji allowlist, authenticated sender identity, 650 ms rate limit, same-room delivery across distance, nearby delivery and distant exclusion.
+- Production Chromium: avatar reaction and automatic expiry; keyboard Space sends and Escape dismisses the native picker; presenter and expanded viewer receive named notices; 390 px layout fits and reduced-motion rendering works.
+- Screen sharing regression passed with forced TURN relay and decoded frames; camera track remained unchanged.

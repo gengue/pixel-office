@@ -1,4 +1,4 @@
-// Pixel bodies 12x16. '.' = transparente. Cabeza = webcam (no incluida aqui).
+// Pixel bodies 12x16. '.' is transparent; the webcam head is drawn separately.
 export const BODIES = {
   hombre: {
     label: 'Man',
@@ -137,10 +137,34 @@ export const BODIES = {
 
 export const BODY_KINDS = Object.keys(BODIES)
 
-export function drawBody(ctx, kind, px, py, scale = 4, walk = 0, sitting = false) {
+export const OUTFIT_COLORS = {
+  original: { label: 'Original' },
+  forest: { label: 'Forest', C: '#5c8a68', D: '#355940' },
+  ocean: { label: 'Ocean', C: '#568fae', D: '#315873' },
+  rose: { label: 'Rose', C: '#c87985', D: '#884956' },
+  amber: { label: 'Amber', C: '#d6aa54', D: '#927038' },
+  lilac: { label: 'Lilac', C: '#9a86bc', D: '#675080' },
+}
+export const ACCESSORIES = { none: 'None', scarf: 'Scarf', satchel: 'Satchel' }
+
+export function normalizeAppearance(value) {
+  return {
+    color: typeof value?.color === 'string' && Object.hasOwn(OUTFIT_COLORS, value.color) ? value.color : 'original',
+    accessory: typeof value?.accessory === 'string' && Object.hasOwn(ACCESSORIES, value.accessory) ? value.accessory : 'none',
+  }
+}
+
+export function drawBody(ctx, kind, px, py, scale = 4, walk = 0, sitting = false, options = {}) {
   const def = BODIES[kind] ?? BODIES.hombre
-  const pal = { ...def.palette, ...(def.extra ?? {}) }
-  const bob = sitting ? 0 : Math.abs(Math.sin(walk)) * 2
+  const appearance = normalizeAppearance(options.appearance)
+  const pal = { ...def.palette, ...(def.extra ?? {}), ...OUTFIT_COLORS[appearance.color] }
+  const motion = sitting ? 0 : (options.motion ?? 0)
+  const stride = Math.sin(walk) * motion
+  const bob = sitting ? 0 : Math.abs(Math.sin(walk * 2)) * motion * 1.5 + Math.sin((options.time ?? 0) * 2) * (1 - motion) * 0.6
+  const pixel = (x, y, w = 1, h = 1) => ctx.fillRect(
+    Math.round(px + (options.facing === -1 ? 12 - x - w : x) * scale),
+    Math.round(py + y * scale - bob), w * scale, h * scale,
+  )
   for (let r = 0; r < def.rows.length; r++) {
     // Fold the legs into a short seated pose, preserving each body's palette.
     if (sitting && r >= 10 && r <= 12) continue
@@ -149,9 +173,27 @@ export function drawBody(ctx, kind, px, py, scale = 4, walk = 0, sitting = false
     for (let c = 0; c < row.length; c++) {
       const ch = row[c]
       if (ch === '.' || ch === ' ') continue
+      const side = c < 6 ? -1 : 1
+      const limb = r >= 10 ? Math.max(0, stride * side) * 1.2
+        : r >= 2 && r <= 5 && (c < 3 || c > 8) ? stride * -side * 0.7 : 0
       ctx.fillStyle = pal[ch] ?? '#fff'
-      ctx.fillRect(Math.round(px + c * scale), Math.round(py + rowY * scale - bob), scale, scale)
+      pixel(c, rowY - limb)
     }
+  }
+  if (appearance.accessory === 'scarf') {
+    ctx.fillStyle = '#e7b859'
+    pixel(2, 0, 8, 2)
+    pixel(7, 2, 2, 4)
+    ctx.fillStyle = '#ae733c'
+    pixel(7, 5, 2, 1)
+  } else if (appearance.accessory === 'satchel') {
+    ctx.fillStyle = '#594331'
+    for (let i = 0; i < 8; i++) pixel(2 + i, i, 1, 2)
+    pixel(8, 6, 4, 4)
+    ctx.fillStyle = '#b18554'
+    pixel(8, 6, 4, 1)
+    ctx.fillStyle = '#e4c678'
+    pixel(9, 7)
   }
 }
 
@@ -159,12 +201,12 @@ export function bodySize(scale = 4) {
   return { w: 12 * scale, h: 16 * scale }
 }
 
-export function renderPreview(canvas, kind) {
+export function renderPreview(canvas, kind, appearance = {}, time = 0, moving = false) {
   const ctx = canvas.getContext('2d')
   const s = 6
   canvas.width = 12 * s
   canvas.height = 16 * s
   ctx.imageSmoothingEnabled = false
   ctx.clearRect(0, 0, canvas.width, canvas.height)
-  drawBody(ctx, kind, 0, 0, s, 0)
+  drawBody(ctx, kind, 0, 4, s, time * 9, false, { appearance, time, motion: moving ? 1 : 0 })
 }
