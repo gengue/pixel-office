@@ -32,6 +32,12 @@ Other devices need HTTPS for camera, microphone and screen capture.
   Camera and microphone stay connected. Leaving the room ends your presentation.
 - Chat messages go to the whole office. Reactions reach people in voice range or
   the same room and disappear after three seconds.
+- The reading room's existing turntable plays quiet jazz (Bill Evans, Peace Piece).
+  Use the music panel to play, pause or paste a YouTube video link; each listener
+  controls their own selection. Volume peaks at 50% within 80 world pixels, fades
+  to silence at 320 pixels and stays silent outside the reading room. YouTube
+  requires internet access and an embeddable video; press Play to enable playback.
+  Music pauses when the tab is hidden, the presentation is expanded or you leave.
 
 Each room allows one presenter. Outside rooms, screen sharing reaches nearby people
 who are also outside rooms. Screen capture targets 720p at 15 fps without system audio.
