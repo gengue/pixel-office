@@ -1,7 +1,7 @@
 export function createSeats(furniture) {
   return furniture.flatMap(([type, x, y, w, h]) => {
     if (type === 'chair') return [{ x: x + 14, y: y + 14, entry: { x: x + 14, y: y + 14 } }]
-    if (type === 'armchair' || type === 'sofaH') {
+    if (type === 'armchair' || type === 'sofaH' || type === 'toilet') {
       const positions = type === 'sofaH' ? [0.3, 0.7] : [0.5]
       return positions.map((part) => ({
         x: Math.round(x + w * part), y: y + h - 28,
