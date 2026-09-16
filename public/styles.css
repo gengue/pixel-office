@@ -1,0 +1,47 @@
+:root { color-scheme: dark; --bg: #0f1226; --panel: #181c38; --line: #2b3160; --txt: #e8eafc; --dim: #9aa1d0; --acc: #7c5cff; --ok: #34d399; }
+* { box-sizing: border-box; }
+body { margin: 0; background: radial-gradient(1200px 600px at 20% -10%, #232a5e, var(--bg)); color: var(--txt); font: 14px/1.45 system-ui, sans-serif; }
+#lobby { min-height: 100vh; display: grid; place-items: center; padding: 24px; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 24px; max-width: 560px; width: 100%; }
+h1 { margin: 0 0 4px; letter-spacing: 1px; }
+.sub { color: var(--dim); margin: 0 0 16px; }
+.field { display: block; margin: 12px 0; color: var(--dim); }
+input { width: 100%; margin-top: 6px; padding: 10px; border-radius: 10px; border: 1px solid var(--line); background: #0d1030; color: var(--txt); }
+.bodies { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 8px; }
+.bodyOpt { border: 2px solid var(--line); border-radius: 12px; background: #0d1030; padding: 8px; cursor: pointer; text-align: center; }
+.bodyOpt.sel { border-color: var(--acc); }
+.bodyOpt canvas { image-rendering: pixelated; width: 48px; height: 64px; }
+.bodyOpt span { display: block; font-size: 12px; color: var(--dim); }
+.row { display: flex; gap: 8px; margin-top: 12px; }
+button { background: var(--acc); border: 0; color: white; border-radius: 10px; padding: 10px 14px; cursor: pointer; font-weight: 700; }
+button.ghost { background: transparent; border: 1px solid var(--line); color: var(--txt); }
+button.sm { padding: 6px 10px; font-weight: 600; }
+.err { color: #f87171; min-height: 1em; }
+.hint { color: var(--dim); font-size: 12px; }
+#stage header { display: flex; gap: 10px; align-items: center; padding: 10px 14px; border-bottom: 1px solid var(--line); background: #12163a; }
+.spacer { flex: 1; }
+.pill { border: 1px solid var(--line); border-radius: 999px; padding: 2px 10px; font-size: 12px; color: var(--dim); }
+.pill.on { border-color: var(--ok); color: var(--ok); }
+#stage main { display: grid; grid-template-columns: 1fr 300px; gap: 12px; padding: 12px; max-width: 1320px; margin: 0 auto; }
+#canvasWrap { position: relative; }
+#map { width: 100%; border-radius: 14px; border: 1px solid var(--line); background: #1a2050; image-rendering: pixelated; display: block; }
+#bubbles { position: absolute; inset: 0; pointer-events: none; }
+.bubble { position: absolute; transform: translate(-50%, -100%); max-width: 190px; background: white; color: #111; border-radius: 12px; padding: 6px 9px; font-size: 12px; pointer-events: auto; cursor: pointer; border: 2px solid #111; }
+.bubble .clamp { display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; max-height: 72px; text-overflow: ellipsis; overflow-wrap: anywhere; }
+.bubble.open .clamp { -webkit-line-clamp: unset; max-height: none; }
+.bubble::after { content: ""; position: absolute; left: 50%; bottom: -8px; border: 8px solid transparent; border-top-color: #111; transform: translateX(-50%); }
+aside { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 12px; display: flex; flex-direction: column; min-height: 400px; }
+aside h2 { margin: 8px 0; font-size: 13px; text-transform: uppercase; letter-spacing: 1px; color: var(--dim); }
+#history { flex: 1; min-height: 220px; max-height: 46vh; overflow: auto; display: flex; flex-direction: column; gap: 8px; }
+.msg { background: #0d1030; border: 1px solid var(--line); border-radius: 10px; padding: 7px 9px; }
+.msg b { color: var(--acc); }
+.msg time { color: var(--dim); font-size: 11px; margin-left: 6px; }
+.msg p { margin: 4px 0 0; overflow-wrap: anywhere; }
+.msg a { color: #7dd3fc; }
+#chatForm { display: flex; gap: 6px; margin-top: 8px; }
+#chatForm input { margin: 0; }
+#peers { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+#peers li { display: flex; justify-content: space-between; border: 1px solid var(--line); border-radius: 8px; padding: 4px 8px; font-size: 13px; }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: #555; display: inline-block; margin-right: 6px; }
+.dot.talk { background: var(--ok); }
+@media (max-width: 900px) { #stage main { grid-template-columns: 1fr; } }

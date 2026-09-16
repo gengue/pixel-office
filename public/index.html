@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>pixel-office · oficina virtual</title>
+<link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+<div id="lobby">
+  <div class="card">
+    <h1>pixel-office</h1>
+    <p class="sub">Elige cuerpo pixel, activa cámara, entra a la oficina. Cabeza = tu webcam en vivo.</p>
+    <label class="field">Tu nombre
+      <input id="name" maxlength="24" placeholder="ej. ada" autocomplete="off" />
+    </label>
+    <div class="field">Cuerpo pixel
+      <div id="bodies" class="bodies"></div>
+    </div>
+    <div class="row">
+      <button id="camBtn" class="ghost" type="button">activar cámara</button>
+      <button id="joinBtn" type="button">entrar a oficina →</button>
+    </div>
+    <p id="lobbyErr" class="err"></p>
+    <p class="hint">WASD / flechas o click para moverte. Acércate (&lt;220px) para hablar por voz. Links en chat se abren en pestaña nueva.</p>
+  </div>
+</div>
+
+<div id="stage" hidden>
+  <header>
+    <strong>pixel-office</strong>
+    <span id="meLabel"></span>
+    <span id="callLabel" class="pill">fuera de llamada</span>
+    <span class="spacer"></span>
+    <span id="count"></span>
+    <button id="muteBtn" class="ghost sm" type="button">mutear</button>
+    <button id="leaveBtn" class="ghost sm" type="button">salir</button>
+  </header>
+  <main>
+    <div id="canvasWrap">
+      <canvas id="map" width="960" height="600"></canvas>
+      <div id="bubbles"></div>
+    </div>
+    <aside>
+      <h2>mensajes</h2>
+      <div id="history"></div>
+      <form id="chatForm">
+        <input id="chatInput" maxlength="500" placeholder="escribe… pega un link" autocomplete="off" />
+        <button type="submit">enviar</button>
+      </form>
+      <h2>gente <span id="peerCount"></span></h2>
+      <ul id="peers"></ul>
+    </aside>
+  </main>
+</div>
+
+<video id="selfVideo" muted playsinline hidden></video>
+<div id="remoteMedia" hidden></div>
+<script type="module" src="/app.js"></script>
+</body>
+</html>
