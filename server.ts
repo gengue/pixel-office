@@ -21,7 +21,7 @@ function serveFile(path: string) {
   })
 }
 
-type Player = { id: string; name: string; body: string; x: number; y: number }
+type Player = { id: string; name: string; body: string; country: string; x: number; y: number }
 type SockData = { id: string; player: Player; tab?: string }
 
 const sockets = new Set<any>()
@@ -90,6 +90,8 @@ const server = Bun.serve<SockData>({
         }
         me.name = String(msg.name ?? 'anon').slice(0, 24) || 'anon'
         me.body = String(msg.body ?? 'hombre').slice(0, 24)
+        const cc = String(msg.country ?? '').toUpperCase().slice(0, 2)
+        me.country = /^[A-Z]{2}$/.test(cc) ? cc : ''
         if (typeof msg.x === 'number') me.x = msg.x
         if (typeof msg.y === 'number') me.y = msg.y
         ws.send(JSON.stringify({ t: 'welcome', id: ws.data.id, roster: roster() }))

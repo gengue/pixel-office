@@ -38,10 +38,10 @@ button:disabled { opacity: 0.6; cursor: wait; }
 .bubble { position: absolute; transform: translate(-50%, -100%); max-width: 190px; background: white; color: #111; border-radius: 12px; padding: 6px 9px; font-size: 12px; pointer-events: auto; cursor: pointer; border: 2px solid #111; }
 .bubble .clamp { display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; max-height: 72px; text-overflow: ellipsis; overflow-wrap: anywhere; }
 .bubble.open .clamp { -webkit-line-clamp: unset; max-height: none; }
-.bubble::before { content: ""; position: absolute; left: 50%; bottom: -20px; transform: translateX(-50%); border: 10px solid transparent; border-top-color: #111; }
-.bubble::after { content: ""; position: absolute; left: 50%; bottom: -16px; transform: translateX(-50%); border: 8px solid transparent; border-top-color: #fff; }
 aside { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 12px; display: flex; flex-direction: column; min-height: 400px; }
 aside h2 { margin: 8px 0; font-size: 13px; text-transform: uppercase; letter-spacing: 1px; color: var(--dim); }
+#flagBar { display: flex; flex-wrap: wrap; gap: 4px; font-size: 20px; min-height: 4px; margin-bottom: 6px; }
+#flagBar span { cursor: default; }
 #history { flex: 1; min-height: 220px; max-height: 46vh; overflow: auto; display: flex; flex-direction: column; gap: 8px; }
 .msg { background: #0d1030; border: 1px solid var(--line); border-radius: 10px; padding: 7px 9px; }
 .msg b { color: var(--acc); }

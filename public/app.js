@@ -40,7 +40,7 @@ let myId = null
 const tabId =
   sessionStorage.getItem('po-tab') ?? crypto.randomUUID?.() ?? String(Math.random())
 sessionStorage.setItem('po-tab', tabId)
-const me = { name: 'anon', body: picked, x: 480, y: 320, tx: null, ty: null, walk: 0, moving: false }
+const me = { name: 'anon', body: picked, country: '', x: 480, y: 320, tx: null, ty: null, walk: 0, moving: false }
 const peers = new Map() // id -> {id,name,body,x,y,walk,moving,videoEl}
 const pcs = new Map() // id -> RTCPeerConnection
 const keys = new Set()
@@ -48,6 +48,45 @@ let muted = false
 const bubbles = new Map() // bubbleId -> {el, pid, until}
 
 const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y)
+
+// country from public IP (server only sees the proxy, so browser looks it up)
+async function lookupCountry() {
+  const valid = (v) => /^[A-Z]{2}$/.test(String(v ?? '').toUpperCase().trim())
+  const clean = (v) => String(v).toUpperCase().trim()
+  const get = async (url, pick) => {
+    const ctl = new AbortController()
+    const to = setTimeout(() => ctl.abort(), 5000)
+    try {
+      const r = await fetch(url, { signal: ctl.signal })
+      const v = clean(await pick(r))
+      return valid(v) ? v : ''
+    } catch {
+      return ''
+    } finally {
+      clearTimeout(to)
+    }
+  }
+  me.country =
+    (await get('https://ipwho.is/?fields=country_code', (r) => r.json().then((j) => j?.country_code))) ||
+    (await get('https://ipapi.co/country/', (r) => r.text()))
+}
+const countryReady = lookupCountry()
+
+const flag = (cc) =>
+  /^[A-Z]{2}$/.test(cc ?? '')
+    ? String.fromCodePoint(...[...cc].map((c) => 127397 + c.charCodeAt(0)))
+    : ''
+let regionName = null
+try {
+  regionName = new Intl.DisplayNames([navigator.language], { type: 'region' })
+} catch {}
+const countryName = (cc) => {
+  try {
+    return regionName?.of(cc) ?? cc
+  } catch {
+    return cc
+  }
+}
 
 // ---------- chat: escape + linkify ----------
 function linkify(raw) {
@@ -122,7 +161,7 @@ function connect() {
   ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`)
   ws.onopen = () => {
     setStatus('joining…', true)
-    send({ t: 'join', tab: tabId, name: me.name, body: me.body, x: me.x, y: me.y })
+    send({ t: 'join', tab: tabId, name: me.name, body: me.body, country: me.country, x: me.x, y: me.y })
   }
   ws.onerror = () => failJoin('Could not reach the server. Check your connection and try again.')
   ws.onclose = () => {
@@ -166,7 +205,7 @@ function connect() {
 
 function upsertPeer(p) {
   if (!peers.has(p.id)) peers.set(p.id, { ...p, tx: p.x, ty: p.y, walk: 0, moving: false, videoEl: null })
-  else Object.assign(peers.get(p.id), { name: p.name, body: p.body })
+  else Object.assign(peers.get(p.id), { name: p.name, body: p.body, country: p.country ?? '' })
 }
 
 const send = (o) => ws?.readyState === 1 && ws.send(JSON.stringify(o))
@@ -304,6 +343,7 @@ $('joinBtn').onclick = async () => {
     }
   }
   setStatus('connecting…', true)
+  await Promise.race([countryReady, new Promise((r) => setTimeout(r, 1200))])
   connect()
   setTimeout(() => {
     if ($('stage').hidden && btn.disabled) {
@@ -525,12 +565,26 @@ function refreshRoster() {
   $('peerCount').textContent = `(${peers.size + 1})`
   const ul = $('peers')
   ul.innerHTML = ''
-  const rows = [{ name: `${me.name} (you)`, self: true }, ...peers.values()]
+  const rows = [{ name: `${me.name} (you)`, country: me.country, self: true }, ...peers.values()]
+  const seen = new Map() // country -> names[]
+  for (const p of rows) {
+    if (!/^[A-Z]{2}$/.test(p.country ?? '')) continue
+    if (!seen.has(p.country)) seen.set(p.country, [])
+    seen.get(p.country).push(p.name)
+  }
+  const bar = $('flagBar')
+  bar.innerHTML = ''
+  for (const [cc, names] of seen) {
+    const s = document.createElement('span')
+    s.textContent = names.length > 1 ? `${flag(cc)}×${names.length}` : flag(cc)
+    s.title = `${countryName(cc)}: ${names.join(', ')}`
+    bar.append(s)
+  }
   for (const p of rows) {
     const li = document.createElement('li')
     const near = p.self ? false : dist(me, p) < TALK
     li.innerHTML = `<span><i class="dot${near ? ' talk' : ''}"></i></span><span class="kind"></span>`
-    li.firstChild.append(document.createTextNode(p.name))
+    li.firstChild.append(document.createTextNode(`${flag(p.country)} ${p.name}`.trim()))
     li.querySelector('.kind').textContent = p.self ? BODIES[me.body].label : BODIES[p.body]?.label ?? p.body
     ul.append(li)
   }
