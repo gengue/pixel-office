@@ -71,3 +71,10 @@ final result: passed
 - Walkability search confirms every new zone and all 36 seat approaches are reachable from the entrance. Browser checks exercise every seat, safe exit, and occupancy synchronization.
 - Capacity is checked by both the client and server on join/move/sit; the fifth visitor sees a full-room notice and can enter when a place is released.
 - Minimap uses a dark/gold double outline and dims the area outside the current viewport. Desktop and mobile artwork reviewed.
+
+## Meeting links
+
+- Reusable aliases for Meeting Room/Huddle Room and numeric x/y destinations; server validates arrivals against shared geometry, existing occupants and room capacity.
+- Browser-tested link creation before joining, clipboard copy/manual fallback, exact coordinates, furniture avoidance, unknown-room fallback, full-room fallback and reload after a place opens.
+- Native dialog fits 390 px, traps focus, dismisses with Escape and prevents movement while interacting.
+- Existing layout moved unchanged to a shared world module so link validation and player movement use the same collision footprints.

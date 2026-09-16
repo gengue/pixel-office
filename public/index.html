@@ -11,6 +11,7 @@
   <div class="card">
     <p class="eyebrow">A LITTLE SPACE TOGETHER</p>
     <h1>Make yourself at home.</h1>
+    <p id="arrivalNote" class="arrivalNote" role="status" hidden></p>
     <p class="sub">Your head is your live camera and you talk by walking up to others. That is why you must allow <b>camera and microphone</b> to enter.</p>
     <label class="field">Your name
       <input id="name" maxlength="24" placeholder="e.g. ada" autocomplete="off" />
@@ -27,6 +28,7 @@
     </fieldset>
     <div class="row">
       <button id="joinBtn" type="button">enter office →</button>
+      <button class="ghost meetingLinkBtn" type="button">Meeting link</button>
     </div>
     <p id="joinStatus" class="status" aria-live="polite"></p>
     <p id="lobbyErr" class="err"></p>
@@ -41,6 +43,7 @@
     <span id="callLabel" class="pill">not in call</span>
     <span class="spacer"></span>
     <span id="count"></span>
+    <button class="ghost sm meetingLinkBtn" type="button">↗ Meeting link</button>
   </header>
   <main>
     <div id="canvasWrap">
@@ -89,6 +92,21 @@
     <div id="reactionPicker" popover aria-label="Choose a reaction"><div id="reactionChoices" role="group" aria-label="Reactions"></div></div>
   </footer>
 </div>
+
+<dialog id="meetingDialog" aria-labelledby="meetingTitle">
+  <div class="meetingHeading">
+    <h2 id="meetingTitle">Create a meeting link</h2>
+    <button id="closeMeeting" class="ghost" type="button" aria-label="Close meeting links">×</button>
+  </div>
+  <p class="hint">Choose where your guests arrive.</p>
+  <label class="field" for="meetingDestination">Destination</label>
+  <select id="meetingDestination"></select>
+  <label class="field" for="meetingURL">Invitation link</label>
+  <input id="meetingURL" readonly />
+  <div class="row"><button id="copyMeeting" type="button">Copy link</button></div>
+  <p id="meetingCopyStatus" role="status" aria-live="polite"></p>
+  <p class="hint">Paste this link into your Google Calendar event description. Room links are reusable and do not reserve a time slot.</p>
+</dialog>
 
 <div id="reactionFeed" role="status" aria-live="polite" aria-relevant="additions" aria-label="Live reactions"></div>
 <video id="selfVideo" muted playsinline hidden></video>

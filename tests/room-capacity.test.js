@@ -23,19 +23,31 @@ test('four-person room enforces capacity on join, movement and sitting, and rele
   try {
     const { value } = await server.stdout.getReader().read()
     const port = new TextDecoder().decode(value).match(/localhost:(\d+)/)[1]
-    const join = async (name) => {
+    const join = async (name, extra = {}) => {
       const ws = new WebSocket(`ws://localhost:${port}/ws`)
       clients.push(ws)
       const messages = []
       ws.onmessage = ({ data }) => messages.push(JSON.parse(data))
       await wait(() => ws.readyState === 1)
       const send = (message) => ws.send(JSON.stringify(message))
-      send({ t: 'join', name, ...inside })
+      send({ t: 'join', name, ...inside, ...extra })
       const welcome = await wait(() => messages.find((m) => m.t === 'welcome'))
       return { ws, send, messages, id: welcome.id, welcome }
     }
     const occupants = []
-    for (let i = 0; i < 4; i++) occupants.push(await join(`Member ${i}`))
+    for (let i = 0; i < 4; i++) occupants.push(await join(`Member ${i}`, { tab: `member-tab-${i}` }))
+    const linked = await join('Meeting link', { destination: '?room=meeting' })
+    expect(linked.welcome.roster.find((p) => p.id === linked.id)).toMatchObject(ROOMS.find((r) => r.alias === 'meeting').arrival)
+    const coordinates = await join('Coordinates', { destination: '?x=1200&y=900' })
+    expect(coordinates.welcome.roster.find((p) => p.id === coordinates.id)).toMatchObject({ x: 1200, y: 900 })
+    for (const destination of ['?room=huddle', '?x=1940&y=810', '?room=unknown']) {
+      const guest = await join('Link guest', { destination })
+      expect(guest.welcome.notice).toBeTruthy()
+      expect(roomAt(guest.welcome.roster.find((p) => p.id === guest.id))).toBe(0)
+    }
+    occupants[1] = await join('Reloaded member', { tab: 'member-tab-1', destination: '?room=huddle' })
+    expect(occupants[1].welcome.notice).toBeUndefined()
+    expect(roomAt(occupants[1].welcome.roster.find((p) => p.id === occupants[1].id))).toBe(ROOMS.indexOf(room))
     const visitor = await join('Visitor')
     expect(roomAt(visitor.welcome.roster.find((p) => p.id === visitor.id))).not.toBe(ROOMS.indexOf(room))
     expect(visitor.messages.filter((m) => m.t === 'move-blocked')).toHaveLength(1)

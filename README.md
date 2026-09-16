@@ -36,6 +36,24 @@ Other devices need HTTPS for camera, microphone and screen capture.
 Each room allows one presenter. Outside rooms, screen sharing reaches nearby people
 who are also outside rooms. Screen capture targets 720p at 15 fps without system audio.
 
+## Meeting links
+
+Use **Meeting link** in the lobby or office header, choose a conference room and
+copy the link into your Google Calendar event description. In the office you can
+also choose **My current position**.
+
+```text
+/?room=meeting
+/?room=huddle
+/?x=1200&y=900
+```
+
+Guests choose their name and grant camera/microphone permission before arriving.
+Room aliases take precedence over coordinates. Coordinates must be finite numbers
+within the 2400×1600 world; walls, furniture and occupied arrival points are adjusted
+to a nearby free spot. Invalid destinations or a full huddle room lead to the welcome
+lounge with an explanation. Room links are reusable, not time-slot reservations.
+
 ## TURN configuration
 
 STUN works by default, but connections across restrictive networks require TURN.
@@ -73,7 +91,9 @@ candidates, screen audience enforcement, reaction validation and viewer lifecycl
 
 - `server.ts`: in-memory players, WebSocket events, presentation audiences and static files.
 - `rtc-config.ts`: server-side TURN credential exchange.
-- `public/app.js`: office layout, movement, rendering, chat and camera connections.
+- `public/app.js`: movement, rendering, chat, camera connections and meeting-link controls.
+- `public/world.js`: shared furniture, walls and collision geometry.
+- `public/meeting-links.js`: URL parsing, link creation and safe arrival resolution.
 - `public/screen-share.js`: display capture and separate presentation connections.
 - `public/office-art.js`, `avatars.js`, `seating.js`: artwork, bodies and usable seats.
 - `public/rooms.js`, `voice.js`, `reactions.js`: shared room and interaction rules.

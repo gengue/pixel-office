@@ -1,3 +1,5 @@
+import { WORLD, BODY_R, walls, furn, hitsSolid } from './world.js'
+import { parseDestination, meetingURL } from './meeting-links.js'
 import { BODIES, BODY_KINDS, OUTFIT_COLORS, ACCESSORIES, normalizeAppearance, drawBody, renderPreview } from './avatars.js'
 import { createOfficeArt } from './office-art.js'
 import { createSeats, findSeat } from './seating.js'
@@ -7,89 +9,9 @@ import { ROOMS as floors, fullRoomAt } from './rooms.js'
 import { REACTIONS } from './reactions.js'
 import { setupScreenShare } from './screen-share.js'
 
-const WORLD = { w: 2400, h: 1600 }
 const VIEW = { w: 960, h: 600 }
-const BODY_R = 14
 const cam = { x: 0, y: 0 }
-const solids = []
-function solid(x, y, w, h) {
-  solids.push({ x, y, w, h })
-}
-function hitsSolid(px, py, r) {
-  for (const s of solids) {
-    if (px + r > s.x && px - r < s.x + s.w && py + r > s.y && py - r < s.y + s.h) return true
-  }
-  return false
-}
-
-// ---------- office layout ----------
-const walls = [
-  [0, 0, 2400, 24], [0, 1576, 2400, 24], [0, 0, 24, 1600], [2376, 0, 24, 1600],
-  [24, 24, 1756, 100],
-  [1780, 60, 580, 20], [1780, 60, 20, 220], [1780, 380, 20, 180],
-  [2340, 60, 20, 500], [1780, 540, 220, 20], [2100, 540, 260, 20],
-  // Restroom stalls, with a shared wash area and an east entrance.
-  [40, 660, 580, 40], [40, 660, 20, 280], [600, 660, 20, 130], [600, 860, 20, 80], [40, 920, 580, 20],
-  [230, 700, 12, 130], [410, 700, 12, 130],
-  [60, 830, 60, 12], [200, 830, 42, 12], [242, 830, 58, 12], [380, 830, 42, 12],
-  // Four-person huddle room; the west doorway stays clear.
-  [1880, 630, 400, 20], [1880, 630, 20, 130], [1880, 860, 20, 60],
-  [2260, 630, 20, 290], [1880, 900, 400, 20],
-  [700, 940, 200, 20], [1000, 940, 400, 20], [1500, 940, 200, 20],
-]
-// furn: [type, x, y, w, h, extra]
-const furn = [
-  ['rug', 120, 120, 360, 200, '#7c5cff33'],
-  ['sofaH', 150, 140, 130, 52], ['sofaH', 350, 140, 130, 52, 'tealSofa'], ['ctable', 270, 260, 80, 44, 'bistro'],
-  ['plant', 540, 145, 28, 24, 'palm'], ['plant', 70, 145, 24, 20, 'snake'],
-  ['desk', 820, 220], ['desk', 1120, 220, 150, 70, 'laptopDesk'], ['desk', 1420, 220],
-  ['desk', 820, 560, 150, 70, 'laptopDesk'], ['desk', 1120, 560], ['desk', 1420, 560, 150, 70, 'laptopDesk'],
-  ['chair', 881, 312], ['chair', 1181, 312], ['chair', 1481, 312],
-  ['chair', 881, 652], ['chair', 1181, 652], ['chair', 1481, 652],
-  ['shelf', 1500, 140, 200, 26],
-  ['plant', 1730, 165, 26, 22, 'rubber'],
-  ['planter', 1640, 360, 100, 26], ['planter', 1640, 700, 100, 26],
-  ['rug', 1850, 150, 440, 300, '#ffffff10'],
-  ['ctableBig', 1920, 245, 300, 120],
-  ['chair', 1970, 197], ['chair', 2070, 197], ['chair', 2170, 197],
-  ['chair', 1970, 389], ['chair', 2070, 389], ['chair', 2170, 389],
-  ['chair', 1878, 283], ['chair', 2228, 283],
-  ['board', 1980, 88, 220, 40],
-  ['plant', 2280, 465, 28, 24, 'palm'], ['plant', 2300, 165, 24, 20, 'snake'],
-  ['rug', 140, 1100, 380, 300, '#7c5cff22'],
-  ['armchair', 150, 1150, 68, 48, 'mustardChair'], ['armchair', 450, 1150, 68, 48],
-  ['armchair', 150, 1310, 68, 48], ['armchair', 450, 1310, 68, 48, 'mustardChair'],
-  ['ctable', 260, 1230, 130, 64, 'bistro'],
-  ['shelf', 120, 1476, 240, 26], ['sideboard', 420, 1450, 150, 36],
-  ['plant', 590, 1120, 26, 22, 'rubber'], ['plant', 90, 1390, 24, 20, 'fern'],
-  ['counterH', 1740, 1150, 220, 44], ['counterH', 1740, 1370, 108, 44],
-  ['fridge', 2280, 1060, 56, 64],
-  ['dtable', 1980, 1260, 180, 90],
-  ['chair', 2020, 1212, 28, 28, 'diningChair'], ['chair', 2100, 1212, 28, 28, 'diningChair'],
-  ['chair', 2020, 1378, 28, 28, 'diningChair'], ['chair', 2100, 1378, 28, 28, 'diningChair'],
-  ['plant', 2280, 1480, 24, 20, 'flowers'], ['water', 2210, 1090, 38, 34],
-  ['sofaH', 880, 1150, 180, 54, 'gardenBench'],
-  ['ctable', 1160, 1230, 150, 70, 'parasol'],
-  ['sofaH', 880, 1390, 180, 54, 'gardenBench'], ['sofaH', 1290, 1390, 180, 54, 'gardenBench'],
-  ['plant', 790, 1140, 30, 28, 'olive'], ['plant', 1530, 1150, 30, 28, 'olive'],
-  ['planter', 800, 1490, 160, 30, 'herbPlanter'], ['planter', 1370, 1490, 160, 30, 'herbPlanter'],
-  ['plant', 1520, 1390, 24, 20, 'flowers'],
-  ['toilet', 130, 740, 48, 50], ['toilet', 310, 740, 48, 50], ['vanity', 465, 735, 100, 50],
-  ['ctableBig', 2000, 780, 170, 70],
-  ['chair', 2000, 735], ['chair', 2110, 735], ['chair', 2000, 860], ['chair', 2110, 860],
-  ['plant', 2215, 735, 24, 20, 'snake'],
-  ['tv', 380, 590, 150, 40], ['sideboard', 80, 610, 180, 36],
-  ['plant', 560, 610, 24, 20, 'snake'],
-]
-for (const [x, y, w, h] of walls) solid(x, y, w, h)
 const seats = createSeats(furn)
-for (const [t, x, y, w, h] of furn) {
-  if (t === 'plant') solid(x, y, w ?? 20, h ?? 20)
-  else if (['board', 'shelf', 'fridge', 'tv', 'armchair', 'planter', 'sideboard', 'water', 'toilet', 'vanity'].includes(t)) solid(x, y, w, h)
-  else if (t.includes('table') || t === 'desk' || t.startsWith('sofa') || t.startsWith('counter')) {
-    solid(x, y, t === 'desk' ? 150 : w, t === 'desk' ? 70 : h)
-  }
-}
 const SPEED = 210
 const HEAD_ZOOM = 1.45 // face crop: higher = tighter on face, less background
 
@@ -311,7 +233,7 @@ function connect() {
   ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`)
   ws.onopen = () => {
     setStatus('joining…', true)
-    send({ t: 'join', tab: tabId, name: me.name, body: me.body, appearance: me.appearance, country: me.country, x: me.x, y: me.y })
+    send({ t: 'join', tab: tabId, name: me.name, body: me.body, appearance: me.appearance, country: me.country, x: me.x, y: me.y, destination: location.search })
   }
   ws.onerror = () => failJoin('Could not reach the server. Check your connection and try again.')
   ws.onclose = () => {
@@ -324,8 +246,14 @@ function connect() {
       myId = m.id
       me.id = myId
       setStatus('')
-      for (const p of m.roster) if (p.id !== myId) upsertPeer(p)
+      for (const p of m.roster) {
+        if (p.id !== myId) upsertPeer(p)
+        else Object.assign(me, { x: p.x, y: p.y, tx: null, ty: null })
+      }
+      cam.x = Math.max(0, Math.min(WORLD.w - VIEW.w, me.x - VIEW.w / 2))
+      cam.y = Math.max(0, Math.min(WORLD.h - VIEW.h, me.y - VIEW.h / 2))
       enterStage()
+      if (m.notice) showRoomNotice(m.notice)
     } else if (m.t === 'peer-join') {
       if (m.player.id !== myId) upsertPeer(m.player)
       refreshRoster()
@@ -338,7 +266,7 @@ function connect() {
       }
     } else if (m.t === 'move-blocked') {
       Object.assign(me, { x: m.x, y: m.y, tx: null, ty: null, sitting: m.sitting })
-      showRoomFull(m.room)
+      showRoomNotice(`${m.room} is full`)
     } else if (m.t === 'peer-leave') {
       peers.delete(m.id)
       closePC(m.id)
@@ -441,6 +369,43 @@ function showReaction({ id, name, emoji }) {
   }, 3000)
 }
 
+// ---------- reusable meeting and position links ----------
+const destination = parseDestination(location.search)
+if (destination) {
+  $('arrivalNote').hidden = false
+  $('arrivalNote').textContent = destination.notice ?? `Destination: ${destination.label}`
+}
+function updateMeetingLink() {
+  const target = $('meetingDestination').value
+  $('meetingURL').value = meetingURL(location.href, target === 'position' ? me : target)
+  $('meetingCopyStatus').textContent = ''
+}
+for (const button of document.querySelectorAll('.meetingLinkBtn')) button.onclick = () => {
+  keys.clear()
+  me.tx = me.ty = null
+  const rooms = floors.filter((room) => room.alias)
+  $('meetingDestination').replaceChildren(...rooms.map((room) => new Option(room.label.toLowerCase(), room.alias)))
+  if (myId) $('meetingDestination').add(new Option('My current position', 'position'))
+  const current = rooms.find((room) => me.x >= room.x && me.x < room.x + room.w && me.y >= room.y && me.y < room.y + room.h)
+  $('meetingDestination').value = current?.alias ?? 'meeting'
+  updateMeetingLink()
+  $('meetingDialog').showModal()
+}
+$('closeMeeting').onclick = () => $('meetingDialog').close()
+$('meetingDestination').onchange = updateMeetingLink
+$('meetingURL').onfocus = (event) => event.target.select()
+$('copyMeeting').onclick = async () => {
+  const link = $('meetingURL').value
+  try {
+    await navigator.clipboard.writeText(link)
+    $('meetingCopyStatus').textContent = 'Link copied. Paste it into your calendar invitation.'
+  } catch {
+    $('meetingURL').focus()
+    $('meetingURL').select()
+    $('meetingCopyStatus').textContent = 'Select and copy the link above.'
+  }
+}
+
 // ---------- WebRTC mesh gated by proximity ----------
 let rtcCfg = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] }
 const screenShare = setupScreenShare({
@@ -534,14 +499,14 @@ setInterval(() => {
 
 // ---------- sitting ----------
 let roomNoticeTimer
-function showRoomFull(room) {
-  $('roomStatus').textContent = `${room} is full`
+function showRoomNotice(text) {
+  $('roomStatus').textContent = text
   clearTimeout(roomNoticeTimer)
-  roomNoticeTimer = setTimeout(() => { $('roomStatus').textContent = '' }, 2500)
+  roomNoticeTimer = setTimeout(() => { $('roomStatus').textContent = '' }, 5000)
 }
 function canMoveTo(x, y) {
   const full = fullRoomAt({ ...me, x, y }, [...peers.values()])
-  if (full) { showRoomFull(full.label); me.tx = me.ty = null }
+  if (full) { showRoomNotice(`${full.label} is full`); me.tx = me.ty = null }
   return !full && !hitsSolid(x, y, BODY_R)
 }
 let seatReturn = null
@@ -564,7 +529,7 @@ function toggleSit() {
   const best = nearbySeat()
   if (!best) return
   const full = fullRoomAt({ ...me, x: best.x, y: best.y }, [...peers.values()])
-  if (full) { showRoomFull(full.label); return }
+  if (full) { showRoomNotice(`${full.label} is full`); return }
   seatReturn = { x: me.x, y: me.y }
   me.x = best.x
   me.y = best.y
@@ -579,7 +544,7 @@ function toggleSit() {
 // ---------- input ----------
 addEventListener('keydown', (e) => {
   if ($('stage').hidden) return
-  if (document.activeElement?.matches('input, textarea, select') || document.activeElement?.closest('#reactionPicker')) return
+  if (document.activeElement?.matches('input, textarea, select') || document.activeElement?.closest('#reactionPicker, dialog')) return
   if (document.activeElement?.matches('button') && [' ', 'Enter'].includes(e.key)) return
   if (e.key.toLowerCase() === 'e') {
     e.preventDefault()

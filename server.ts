@@ -1,5 +1,7 @@
 import { readFileSync, existsSync, statSync } from 'node:fs'
 import { join, extname } from 'node:path'
+import { WORLD } from './public/world.js'
+import { resolveArrival } from './public/meeting-links.js'
 import { getRTCConfig } from './rtc-config'
 import { normalizeAppearance } from './public/avatars.js'
 import { REACTIONS } from './public/reactions.js'
@@ -40,15 +42,12 @@ function spawnPoint(): { x: number; y: number } {
   return { x: 70 + Math.random() * 100, y: 330 + Math.random() * 60 }
 }
 
-const WORLD_W = 2400
-const WORLD_H = 1600
-
 function movePlayer(ws: any, x: unknown, y: unknown) {
   const me = ws.data.player
   const next = {
     ...me,
-    x: typeof x === 'number' && Number.isFinite(x) ? Math.max(24, Math.min(WORLD_W - 24, x)) : me.x,
-    y: typeof y === 'number' && Number.isFinite(y) ? Math.max(40, Math.min(WORLD_H - 24, y)) : me.y,
+    x: typeof x === 'number' && Number.isFinite(x) ? Math.max(24, Math.min(WORLD.w - 24, x)) : me.x,
+    y: typeof y === 'number' && Number.isFinite(y) ? Math.max(40, Math.min(WORLD.h - 24, y)) : me.y,
   }
   const full = fullRoomAt(next, roster().filter((p) => p.name))
   if (full) {
@@ -151,8 +150,10 @@ const server = Bun.serve<SockData>({
         me.country = /^[A-Z]{2}$/.test(cc) ? cc : ''
         me.hand = false
         me.sitting = false
-        movePlayer(ws, msg.x, msg.y)
-        ws.send(JSON.stringify({ t: 'welcome', id: ws.data.id, roster: roster() }))
+        const arrival = resolveArrival(msg.destination, roster().filter((p) => p.name), me.id)
+        if (arrival?.point) movePlayer(ws, arrival.point.x, arrival.point.y)
+        else if (!arrival) movePlayer(ws, msg.x, msg.y)
+        ws.send(JSON.stringify({ t: 'welcome', id: ws.data.id, roster: roster(), notice: arrival?.notice }))
         broadcast({ t: 'peer-join', player: me }, ws.data.id)
         updateShares()
         return
