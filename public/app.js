@@ -50,6 +50,9 @@ $('camBtn').onclick = async () => {
 // ---------- state ----------
 let ws = null
 let myId = null
+const tabId =
+  sessionStorage.getItem('po-tab') ?? crypto.randomUUID?.() ?? String(Math.random())
+sessionStorage.setItem('po-tab', tabId)
 const me = { name: 'anon', body: picked, x: 480, y: 320, tx: null, ty: null, walk: 0, moving: false }
 const peers = new Map() // id -> {id,name,body,x,y,walk,moving,videoEl}
 const pcs = new Map() // id -> RTCPeerConnection
@@ -114,17 +117,25 @@ function failJoin(msg) {
 
 function enterStage() {
   if (!$('stage').hidden) return
-  $('lobby').hidden = true
+  setStatus('')
+  $('lobby').classList.add('leaving')
+  setTimeout(() => {
+    $('lobby').hidden = true
+  }, 300)
   $('stage').hidden = false
   $('meLabel').textContent = `${me.name} · ${BODIES[me.body].label}`
   refreshRoster()
 }
 
 function connect() {
+  // mata conexión previa: una pestaña = un player (evita gemelo fantasma)
+  try {
+    ws?.close()
+  } catch {}
   ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`)
   ws.onopen = () => {
     setStatus('entrando…', true)
-    send({ t: 'join', name: me.name, body: me.body, x: me.x, y: me.y })
+    send({ t: 'join', tab: tabId, name: me.name, body: me.body, x: me.x, y: me.y })
   }
   ws.onerror = () => failJoin('No se pudo conectar al servidor. Revisa tu conexión e inténtalo de nuevo.')
   ws.onclose = () => {
@@ -138,9 +149,10 @@ function connect() {
       for (const p of m.roster) if (p.id !== myId) upsertPeer(p)
       enterStage()
     } else if (m.t === 'peer-join') {
-      upsertPeer(m.player)
+      if (m.player.id !== myId) upsertPeer(m.player)
       refreshRoster()
     } else if (m.t === 'peer-move') {
+      if (m.id === myId) return
       const p = peers.get(m.id)
       if (p) {
         p.tx = m.x
@@ -211,7 +223,7 @@ async function maybeCall(pid) {
 }
 
 async function onSignal(from, d) {
-  if (!localStream) return
+  if (from === myId || !localStream) return
   if (d.kind === 'offer') {
     const pc = ensurePC(from)
     if (!pc) return
@@ -271,6 +283,8 @@ canvas.addEventListener('pointerdown', (e) => {
 // ---------- join / leave ----------
 $('joinBtn').onclick = () => {
   const btn = $('joinBtn')
+  if (btn.disabled) return
+  if (ws && ws.readyState <= 1) return // join ya en curso
   btn.disabled = true
   btn.textContent = 'entrando…'
   $('lobbyErr').textContent = ''

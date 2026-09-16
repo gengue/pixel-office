@@ -22,10 +22,11 @@ function serveFile(path: string) {
 }
 
 type Player = { id: string; name: string; body: string; x: number; y: number }
-type SockData = { id: string; player: Player }
+type SockData = { id: string; player: Player; tab?: string }
 
 const sockets = new Set<any>()
 const byId = new Map<string, any>()
+const tabs = new Map<string, any>() // tabId -> ws (una pestaña = un player)
 let seq = 0
 
 function spawnPoint(): { x: number; y: number } {
@@ -75,6 +76,18 @@ const server = Bun.serve<SockData>({
       }
       const me = ws.data.player
       if (msg.t === 'join') {
+        const tab = String(msg.tab ?? '')
+        if (tab) {
+          const old = tabs.get(tab)
+          if (old && old !== ws) {
+            tabs.delete(tab)
+            try {
+              old.close()
+            } catch {}
+          }
+          tabs.set(tab, ws)
+          ws.data.tab = tab
+        }
         me.name = String(msg.name ?? 'anon').slice(0, 24) || 'anon'
         me.body = String(msg.body ?? 'hombre').slice(0, 24)
         if (typeof msg.x === 'number') me.x = msg.x
@@ -106,6 +119,7 @@ const server = Bun.serve<SockData>({
     close(ws) {
       sockets.delete(ws)
       byId.delete(ws.data.id)
+      if (ws.data.tab && tabs.get(ws.data.tab) === ws) tabs.delete(ws.data.tab)
       broadcast({ t: 'peer-leave', id: ws.data.id })
     },
   },
