@@ -10,6 +10,7 @@ import { LINK, voiceVolume } from './voice.js'
 import { ROOMS as floors, fullRoomAt } from './rooms.js'
 import { REACTIONS } from './reactions.js'
 import { setupScreenShare } from './screen-share.js'
+import { setupMusic } from './music.js'
 
 const VIEW = { w: 960, h: 600 }
 const cam = { x: 0, y: 0 }
@@ -118,6 +119,7 @@ const tabId =
   sessionStorage.getItem('po-tab') ?? crypto.randomUUID?.() ?? String(Math.random())
 sessionStorage.setItem('po-tab', tabId)
 const me = { name: 'anon', body: picked, appearance, country: '', hand: false, sitting: false, x: 120, y: 360, tx: null, ty: null, walk: 0, moving: false, motion: 0, facing: 1 }
+const music = setupMusic(() => me)
 const peers = new Map() // id -> {id,name,body,x,y,walk,moving,videoEl}
 window.__po = { me, cam, peers, WORLD, VIEW }
 const pcs = new Map() // id -> RTCPeerConnection
@@ -246,6 +248,7 @@ function connect() {
     cancelVisit()
     arrivals.clear()
     screenShare.reset()
+    music.pause()
     if (!$('stage').hidden && !myId) failJoin('Connection lost before entering. Try again.')
   }
   ws.onmessage = (ev) => {
@@ -672,7 +675,7 @@ addEventListener('beforeunload', () => {
   } catch {}
 })
 
-$('leaveBtn').onclick = () => { screenShare.reset(); location.reload() }
+$('leaveBtn').onclick = () => { music.pause(); screenShare.reset(); location.reload() }
 $('sitBtn').onclick = toggleSit
 $('handBtn').onclick = (e) => {
   me.hand = !me.hand
@@ -1056,6 +1059,7 @@ function tick(now) {
     me.x = Math.max(30, Math.min(WORLD.w - 30, me.x))
     me.y = Math.max(40, Math.min(WORLD.h - 30, me.y))
     screenShare.update()
+    music.update()
     me.moving = !me.sitting && Math.hypot(me.x - oldX, me.y - oldY) > 0.01
     if (Math.abs(me.x - oldX) > 0.01) me.facing = Math.sign(me.x - oldX)
     // camera follows avatar
