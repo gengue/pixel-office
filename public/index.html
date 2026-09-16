@@ -32,7 +32,7 @@
     </div>
     <p id="joinStatus" class="status" aria-live="polite"></p>
     <p id="lobbyErr" class="err"></p>
-    <p class="hint">WASD / arrows or click to move. Walk up to someone to talk by voice. Press E near a chair or sofa to sit; press E again or move to stand up.</p>
+    <p class="hint">WASD / arrows or click to move. Walk up to someone to talk by voice. Press E near a chair or sofa to sit; press E again or move to stand up. Press B near the reading room turntable to dance.</p>
   </div>
 </div>
 
@@ -47,11 +47,14 @@
   </header>
   <main>
     <div id="canvasWrap">
-      <canvas id="map" width="960" height="600" aria-label="Virtual office. Move with WASD, arrow keys, or click. Press E near a chair or sofa to sit."></canvas>
+      <canvas id="map" width="960" height="600" aria-label="Virtual office. Move with WASD, arrow keys, or click. Press E near a chair or sofa to sit. Press B near the reading room turntable to dance."></canvas>
       <canvas id="mini" width="190" height="127" aria-label="Office minimap. The gold outline marks your current view." title="Gold outline: your current view"></canvas>
       <div id="bubbles"></div>
       <p id="roomStatus" role="status" aria-live="polite"></p>
-      <button id="sitBtn" type="button" hidden>E · Sit down</button>
+      <div id="nearbyActions" role="group" aria-label="Nearby actions">
+        <button id="sitBtn" type="button" hidden>E · Sit down</button>
+        <button id="danceBtn" type="button" aria-pressed="false" hidden>B · Dance</button>
+      </div>
     </div>
     <aside>
       <section id="screenPanel" hidden aria-label="Screen sharing">

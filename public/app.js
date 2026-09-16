@@ -9,7 +9,7 @@ import { LINK, voiceVolume } from './voice.js'
 import { ROOMS as floors, fullRoomAt } from './rooms.js'
 import { REACTIONS } from './reactions.js'
 import { setupScreenShare } from './screen-share.js'
-import { setupMusic } from './music.js'
+import { setupMusic, musicVolume } from './music.js'
 
 const VIEW = { w: 960, h: 600 }
 const cam = { x: 0, y: 0 }
@@ -113,7 +113,7 @@ let myId = null
 const tabId =
   sessionStorage.getItem('po-tab') ?? crypto.randomUUID?.() ?? String(Math.random())
 sessionStorage.setItem('po-tab', tabId)
-const me = { name: 'anon', body: picked, appearance, country: '', hand: false, sitting: false, x: 120, y: 360, tx: null, ty: null, walk: 0, moving: false, motion: 0, facing: 1 }
+const me = { name: 'anon', body: picked, appearance, country: '', hand: false, sitting: false, dancing: false, x: 120, y: 360, tx: null, ty: null, walk: 0, moving: false, motion: 0, facing: 1 }
 const music = setupMusic(() => me)
 const peers = new Map() // id -> {id,name,body,x,y,walk,moving,videoEl}
 window.__po = { me, cam, peers, WORLD, VIEW }
@@ -243,6 +243,7 @@ function connect() {
     cancelVisit()
     screenShare.reset()
     music.pause()
+    stopDancing()
     if (!$('stage').hidden && !myId) failJoin('Connection lost before entering. Try again.')
   }
   ws.onmessage = (ev) => {
@@ -301,6 +302,9 @@ function connect() {
         p.ty = m.y
         refreshRoster()
       }
+    } else if (m.t === 'peer-dance') {
+      const p = m.id === myId ? me : peers.get(m.id)
+      if (p) { p.dancing = !!m.dancing; refreshRoster() }
     } else if (m.t === 'chat') {
       addHistory(m.name, m.text, m.at)
       addBubble(m.id, m.text)
@@ -319,7 +323,7 @@ function connect() {
 
 function upsertPeer(p) {
   if (!peers.has(p.id)) peers.set(p.id, { ...p, appearance: normalizeAppearance(p.appearance), tx: p.x, ty: p.y, walk: 0, moving: false, motion: 0, facing: 1, videoEl: null })
-  else Object.assign(peers.get(p.id), { name: p.name, body: p.body, appearance: normalizeAppearance(p.appearance), country: p.country ?? '', hand: !!p.hand, sitting: !!p.sitting })
+  else Object.assign(peers.get(p.id), { name: p.name, body: p.body, appearance: normalizeAppearance(p.appearance), country: p.country ?? '', hand: !!p.hand, sitting: !!p.sitting, dancing: !!p.dancing })
 }
 
 const send = (o) => ws?.readyState === 1 && ws.send(JSON.stringify(o))
@@ -516,6 +520,7 @@ function visitPerson(id) {
   if (visit?.id === id) { cancelVisit(); return }
   const peer = peers.get(id)
   if (!peer) return
+  stopDancing()
   standUp()
   const target = { x: peer.tx ?? peer.x, y: peer.ty ?? peer.y }
   const path = pathToPerson(me, target, [...peers.values()])
@@ -562,6 +567,7 @@ function toggleSit() {
   if (!best) return
   const full = fullRoomAt({ ...me, x: best.x, y: best.y }, [...peers.values()])
   if (full) { showRoomNotice(`${full.label} is full`); return }
+  stopDancing()
   seatReturn = { x: me.x, y: me.y }
   me.x = best.x
   me.y = best.y
@@ -571,6 +577,25 @@ function toggleSit() {
   me.walk = 0
   send({ t: 'move', x: Math.round(me.x), y: Math.round(me.y) })
   sendSit()
+}
+
+function stopDancing() {
+  if (!me.dancing) return
+  me.dancing = false
+  send({ t: 'dance', dancing: false })
+  refreshRoster()
+}
+
+function toggleDance() {
+  if (me.dancing) { stopDancing(); return }
+  if (me.sitting || musicVolume(me) <= 0 || ws?.readyState !== 1) return
+  cancelVisit()
+  me.tx = me.ty = null
+  me.moving = false
+  me.dancing = true
+  send({ t: 'move', x: Math.round(me.x), y: Math.round(me.y) })
+  send({ t: 'dance', dancing: true })
+  refreshRoster()
 }
 
 // ---------- input ----------
@@ -583,6 +608,11 @@ addEventListener('keydown', (e) => {
     if (!e.repeat) toggleSit()
     return
   }
+  if (e.key.toLowerCase() === 'b') {
+    e.preventDefault()
+    if (!e.repeat) toggleDance()
+    return
+  }
   if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' '].includes(e.key)) e.preventDefault()
   if (['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright', 'escape'].includes(e.key.toLowerCase())) cancelVisit()
   keys.add(e.key.toLowerCase())
@@ -590,6 +620,7 @@ addEventListener('keydown', (e) => {
 addEventListener('keyup', (e) => keys.delete(e.key.toLowerCase()))
 
 canvas.addEventListener('pointerdown', (e) => {
+  stopDancing()
   cancelVisit()
   standUp()
   const r = canvas.getBoundingClientRect()
@@ -666,6 +697,7 @@ addEventListener('beforeunload', () => {
 
 $('leaveBtn').onclick = () => { music.pause(); screenShare.reset(); location.reload() }
 $('sitBtn').onclick = toggleSit
+$('danceBtn').onclick = toggleDance
 $('handBtn').onclick = (e) => {
   me.hand = !me.hand
   send({ t: 'hand', hand: me.hand })
@@ -945,7 +977,7 @@ function drawAvatar(p, videoEl, isMe, inCall, now) {
   const s = 4
   const bw = 12 * s
   const headR = 22
-  const cx = p.x
+  const cx = p.x + (p.dancing && !reducedMotion.matches ? Math.sin(now / 1000 * 6) * 5 : 0)
   const bodyY = p.y - (p.sitting ? 32 : 8)
   // shadow
   ctx.fillStyle = '#00000055'
@@ -962,11 +994,12 @@ function drawAvatar(p, videoEl, isMe, inCall, now) {
   drawBody(ctx, p.body, cx - bw / 2, bodyY, s, p.walk, p.sitting, {
     appearance: p.appearance, facing: p.facing, motion: reducedMotion.matches ? 0 : p.motion,
     time: reducedMotion.matches ? 0 : now / 1000,
+    dancing: p.dancing,
   })
   drawHead(cx, bodyY - headR + 6, headR, videoEl, initialsOf(p.name || '?'))
   // nametag
   ctx.font = 'bold 12px system-ui'
-  const label = `${p.name}${isMe ? ' (you)' : ''}`
+  const label = `${p.dancing ? '♫ ' : ''}${p.name}${isMe ? ' (you)' : ''}`
   const tw = ctx.measureText(label).width + 14
   ctx.fillStyle = isMe ? '#427461' : '#2c4138ee'
   ctx.strokeStyle = '#111'
@@ -1028,12 +1061,14 @@ function tick(now) {
     }
     me.moving = false
     if (vx || vy) {
+      stopDancing()
       standUp()
       const n = Math.hypot(vx, vy)
       step((vx / n) * SPEED * dt, (vy / n) * SPEED * dt)
       me.tx = me.ty = null
       me.moving = true
     } else if (me.tx !== null) {
+      stopDancing()
       const dx = me.tx - me.x
       const dy = me.ty - me.y
       const d = Math.hypot(dx, dy)
@@ -1049,6 +1084,7 @@ function tick(now) {
     me.y = Math.max(40, Math.min(WORLD.h - 30, me.y))
     screenShare.update()
     music.update()
+    if (me.dancing && musicVolume(me) <= 0) stopDancing()
     me.moving = !me.sitting && Math.hypot(me.x - oldX, me.y - oldY) > 0.01
     if (Math.abs(me.x - oldX) > 0.01) me.facing = Math.sign(me.x - oldX)
     // camera follows avatar
@@ -1104,6 +1140,9 @@ function tick(now) {
     drawMini(all)
     $('sitBtn').hidden = !me.sitting && !nearbySeat()
     $('sitBtn').textContent = me.sitting ? 'E · Stand up' : 'E · Sit down'
+    $('danceBtn').hidden = !me.dancing && (me.sitting || musicVolume(me) <= 0)
+    $('danceBtn').textContent = me.dancing ? 'B · Stop dancing' : 'B · Dance'
+    $('danceBtn').setAttribute('aria-pressed', String(me.dancing))
     // bubbles follow avatar
     const r = canvas.getBoundingClientRect()
     const sx = r.width / VIEW.w
@@ -1133,7 +1172,7 @@ function refreshRoster() {
   const ul = $('peers')
   const focused = ul.contains(document.activeElement) ? document.activeElement.dataset.peer : null
   ul.innerHTML = ''
-  const rows = [{ name: `${me.name} (you)`, country: me.country, hand: me.hand, sitting: me.sitting, self: true }, ...peers.values()]
+  const rows = [{ name: `${me.name} (you)`, country: me.country, hand: me.hand, sitting: me.sitting, dancing: me.dancing, self: true }, ...peers.values()]
   const seen = new Map() // country -> names[]
   for (const p of rows) {
     if (!/^[A-Z]{2}$/.test(p.country ?? '')) continue
@@ -1152,7 +1191,7 @@ function refreshRoster() {
     const li = document.createElement('li')
     const near = p.self ? false : voiceVolume(me, p, floors) > 0
     li.innerHTML = `<span><i class="dot${near ? ' talk' : ''}"></i></span><span class="kind"></span>`
-    li.firstChild.append(document.createTextNode(`${p.sitting ? '🪑 ' : ''}${p.hand ? '✋ ' : ''}${flag(p.country)} ${p.name}`.trim()))
+    li.firstChild.append(document.createTextNode(`${p.dancing ? '♫ ' : ''}${p.sitting ? '🪑 ' : ''}${p.hand ? '✋ ' : ''}${flag(p.country)} ${p.name}`.trim()))
     li.querySelector('.kind').textContent = p.self ? BODIES[me.body].label : BODIES[p.body]?.label ?? p.body
     if (!p.self) {
       const button = document.createElement('button')

@@ -7,6 +7,7 @@ import { normalizeAppearance } from './public/avatars.js'
 import { REACTIONS } from './public/reactions.js'
 import { ROOMS, roomAt, fullRoomAt } from './public/rooms.js'
 import { canViewScreen, voiceVolume, LINK } from './public/voice.js'
+import { musicVolume } from './public/music.js'
 
 const PORT = Number(process.env.PORT ?? 3000)
 const PUB = join(import.meta.dir, 'public')
@@ -28,7 +29,7 @@ function serveFile(path: string) {
   })
 }
 
-type Player = { id: string; name: string; body: string; appearance?: ReturnType<typeof normalizeAppearance>; country: string; hand: boolean; sitting: boolean; x: number; y: number }
+type Player = { id: string; name: string; body: string; appearance?: ReturnType<typeof normalizeAppearance>; country: string; hand: boolean; sitting: boolean; dancing: boolean; x: number; y: number }
 type SockData = { id: string; player: Player; tab?: string; shareState?: string; lastReaction?: number }
 type ScreenShare = { id: string; owner: string; room: number }
 
@@ -54,6 +55,7 @@ function movePlayer(ws: any, x: unknown, y: unknown) {
     ws.send(JSON.stringify({ t: 'move-blocked', x: me.x, y: me.y, sitting: !!me.sitting, room: full.label }))
     return false
   }
+  if (me.dancing && (next.x !== me.x || next.y !== me.y)) setDancing(ws, false)
   me.x = next.x
   me.y = next.y
   return true
@@ -71,6 +73,11 @@ function broadcast(msg: unknown, except?: string) {
 
 function roster() {
   return [...byId.values()].map((ws) => ws.data.player)
+}
+
+function setDancing(ws: any, dancing: boolean) {
+  ws.data.player.dancing = dancing
+  broadcast({ t: 'peer-dance', id: ws.data.id, dancing })
 }
 
 function updateShares() {
@@ -150,6 +157,7 @@ const server = Bun.serve<SockData>({
         me.country = /^[A-Z]{2}$/.test(cc) ? cc : ''
         me.hand = false
         me.sitting = false
+        me.dancing = false
         const arrival = resolveArrival(msg.destination, roster().filter((p) => p.name), me.id)
         if (arrival?.point) movePlayer(ws, arrival.point.x, arrival.point.y)
         else if (!arrival) movePlayer(ws, msg.x, msg.y)
@@ -172,8 +180,14 @@ const server = Bun.serve<SockData>({
       if (msg.t === 'sit') {
         if (!me.name || !movePlayer(ws, msg.x, msg.y)) return
         me.sitting = !!msg.sitting
+        if (me.sitting && me.dancing) setDancing(ws, false)
         broadcast({ t: 'peer-sit', id: ws.data.id, sitting: me.sitting, x: me.x, y: me.y })
         updateShares()
+        return
+      }
+      if (msg.t === 'dance') {
+        if (!me.name) return
+        setDancing(ws, msg.dancing === true && !me.sitting && musicVolume(me) > 0)
         return
       }
       if (msg.t === 'share-start') {

@@ -159,7 +159,8 @@ export function drawBody(ctx, kind, px, py, scale = 4, walk = 0, sitting = false
   const appearance = normalizeAppearance(options.appearance)
   const pal = { ...def.palette, ...(def.extra ?? {}), ...OUTFIT_COLORS[appearance.color] }
   const motion = sitting ? 0 : (options.motion ?? 0)
-  const stride = Math.sin(walk) * motion
+  const dancing = options.dancing && !sitting
+  const stride = dancing ? Math.sin((options.time ?? 0) * 6) : Math.sin(walk) * motion
   const bob = sitting ? 0 : Math.abs(Math.sin(walk * 2)) * motion * 1.5 + Math.sin((options.time ?? 0) * 2) * (1 - motion) * 0.6
   const pixel = (x, y, w = 1, h = 1) => ctx.fillRect(
     Math.round(px + (options.facing === -1 ? 12 - x - w : x) * scale),
@@ -175,7 +176,7 @@ export function drawBody(ctx, kind, px, py, scale = 4, walk = 0, sitting = false
       if (ch === '.' || ch === ' ') continue
       const side = c < 6 ? -1 : 1
       const limb = r >= 10 ? Math.max(0, stride * side) * 1.2
-        : r >= 2 && r <= 5 && (c < 3 || c > 8) ? stride * -side * 0.7 : 0
+        : r >= 2 && r <= 5 && (c < 3 || c > 8) ? (dancing ? 2 : 0) + stride * -side * (dancing ? 1.5 : 0.7) : 0
       ctx.fillStyle = pal[ch] ?? '#fff'
       pixel(c, rowY - limb)
     }

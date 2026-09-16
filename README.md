@@ -38,6 +38,9 @@ Other devices need HTTPS for camera, microphone and screen capture.
   to silence at 320 pixels and stays silent outside the reading room. YouTube
   requires internet access and an embeddable video; press Play to enable playback.
   Music pauses when the tab is hidden, the presentation is expanded or you leave.
+- Near the turntable, press **B** or click **Dance** to dance in place; everyone
+  sees your dance. Press B again, walk or sit to stop. E still controls sitting.
+  Reduced-motion mode shows a static dance pose instead of animation.
 
 Each room allows one presenter. Outside rooms, screen sharing reaches nearby people
 who are also outside rooms. Screen capture targets 720p at 15 fps without system audio.
