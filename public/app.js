@@ -1,7 +1,71 @@
 import { BODIES, BODY_KINDS, drawBody, renderPreview } from './avatars.js'
 
-const W = 960
-const H = 600
+const WORLD = { w: 2400, h: 1600 }
+const VIEW = { w: 960, h: 600 }
+const BODY_R = 14
+const cam = { x: 0, y: 0 }
+const solids = []
+function solid(x, y, w, h) {
+  solids.push({ x, y, w, h })
+}
+function hitsSolid(px, py, r) {
+  for (const s of solids) {
+    if (px + r > s.x && px - r < s.x + s.w && py + r > s.y && py - r < s.y + s.h) return true
+  }
+  return false
+}
+
+// ---------- office layout ----------
+const floors = [
+  { x: 40, y: 40, w: 580, h: 380, c: '#2b3170', label: 'LOBBY', lx: 330, ly: 72 },
+  { x: 680, y: 60, w: 1040, h: 820, c: '#262c66', label: 'OPEN OFFICE', lx: 1200, ly: 112 },
+  { x: 1800, y: 80, w: 540, h: 460, c: '#3a2b5c', label: 'MEETING', lx: 2070, ly: 128 },
+  { x: 60, y: 1000, w: 600, h: 540, c: '#28493c', label: 'LOUNGE', lx: 360, ly: 1052 },
+  { x: 1700, y: 1020, w: 650, h: 520, c: '#3d3a4a', label: 'KITCHEN', lx: 2090, ly: 1078 },
+]
+const walls = [
+  [0, 0, 2400, 24], [0, 1576, 2400, 24], [0, 0, 24, 1600], [2376, 0, 24, 1600],
+  [1780, 60, 580, 20], [1780, 60, 20, 220], [1780, 380, 20, 180],
+  [2340, 60, 20, 500], [1780, 540, 220, 20], [2100, 540, 260, 20],
+  [700, 940, 200, 20], [1000, 940, 400, 20], [1500, 940, 200, 20],
+]
+// furn: [type, x, y, w, h, extra]
+const furn = [
+  ['rug', 120, 120, 360, 200, '#7c5cff33'],
+  ['sofaH', 150, 140, 130, 52], ['sofaH', 350, 140, 130, 52], ['ctable', 270, 225, 80, 44],
+  ['plant', 560, 80], ['plant', 80, 350],
+  ['desk', 820, 220], ['desk', 1120, 220], ['desk', 1420, 220],
+  ['desk', 820, 560], ['desk', 1120, 560], ['desk', 1420, 560],
+  ['chair', 881, 312], ['chair', 1181, 312], ['chair', 1481, 312],
+  ['chair', 881, 652], ['chair', 1181, 652], ['chair', 1481, 652],
+  ['shelf', 1500, 80, 200, 26],
+  ['plant', 700, 100], ['plant', 1700, 100], ['plant', 700, 840], ['plant', 1700, 840],
+  ['rug', 1850, 150, 440, 300, '#ffffff10'],
+  ['ctableBig', 1920, 245, 300, 120],
+  ['chair', 1970, 197], ['chair', 2070, 197], ['chair', 2170, 197],
+  ['chair', 1970, 389], ['chair', 2070, 389], ['chair', 2170, 389],
+  ['chair', 1878, 283], ['chair', 2228, 283],
+  ['board', 1980, 88, 220, 40],
+  ['plant', 2290, 470],
+  ['rug', 140, 1100, 380, 300, '#7c5cff22'],
+  ['sofaV', 150, 1130, 54, 200], ['sofaV', 466, 1130, 54, 200], ['ctable', 234, 1200, 132, 60],
+  ['shelf', 120, 1476, 240, 26], ['tv', 420, 1450, 150, 30],
+  ['plant', 600, 1040], ['plant', 90, 1490],
+  ['counterH', 1740, 1100, 300, 44], ['counterV', 1740, 1100, 44, 260],
+  ['fridge', 2280, 1060, 56, 64],
+  ['dtable', 1980, 1260, 180, 90],
+  ['chair', 2020, 1212], ['chair', 2100, 1212], ['chair', 2020, 1378], ['chair', 2100, 1378],
+  ['plant', 2300, 1470],
+]
+for (const [x, y, w, h] of walls) solid(x, y, w, h)
+for (const [t, x, y, w, h] of furn) {
+  if (t === 'plant') solid(x, y, 20, 20)
+  else if (t === 'chair') solid(x, y, 28, 28)
+  else if (t === 'board' || t === 'shelf' || t === 'fridge') solid(x, y, w, h)
+  else if (t.includes('table') || t === 'desk' || t.startsWith('sofa') || t.startsWith('counter')) {
+    solid(x, y, t === 'desk' ? 150 : w, t === 'desk' ? 70 : h)
+  }
+}
 const TALK = 220
 const LINK = 330
 const SPEED = 210
@@ -40,8 +104,9 @@ let myId = null
 const tabId =
   sessionStorage.getItem('po-tab') ?? crypto.randomUUID?.() ?? String(Math.random())
 sessionStorage.setItem('po-tab', tabId)
-const me = { name: 'anon', body: picked, country: '', hand: false, x: 480, y: 320, tx: null, ty: null, walk: 0, moving: false }
+const me = { name: 'anon', body: picked, country: '', hand: false, x: 120, y: 360, tx: null, ty: null, walk: 0, moving: false }
 const peers = new Map() // id -> {id,name,body,x,y,walk,moving,videoEl}
+window.__po = { me, cam, peers, WORLD, VIEW }
 const pcs = new Map() // id -> RTCPeerConnection
 const keys = new Set()
 let muted = false
@@ -309,8 +374,8 @@ addEventListener('keyup', (e) => keys.delete(e.key.toLowerCase()))
 
 canvas.addEventListener('pointerdown', (e) => {
   const r = canvas.getBoundingClientRect()
-  me.tx = ((e.clientX - r.left) / r.width) * W
-  me.ty = ((e.clientY - r.top) / r.height) * H
+  me.tx = cam.x + ((e.clientX - r.left) / r.width) * VIEW.w
+  me.ty = cam.y + ((e.clientY - r.top) / r.height) * VIEW.h
 })
 
 // ---------- join / leave ----------
@@ -324,8 +389,8 @@ $('joinBtn').onclick = async () => {
   const name = $('name').value.trim() || `user${Math.floor(Math.random() * 999)}`
   me.name = name.slice(0, 24)
   me.body = picked
-  me.x = 120 + Math.random() * 720
-  me.y = 140 + Math.random() * 380
+  me.x = 70 + Math.random() * 100
+  me.y = 330 + Math.random() * 60
   // camera + mic required: no head or voice without them, no entry
   if (!localStream) {
     setStatus('asking for camera and microphone…', true)
@@ -389,33 +454,214 @@ $('chatForm').onsubmit = (e) => {
 }
 
 // ---------- render ----------
-function drawOffice() {
-  ctx.fillStyle = '#232a5e'
-  ctx.fillRect(0, 0, W, H)
-  ctx.fillStyle = '#272e68'
-  for (let y = 0; y < H; y += 40) for (let x = (y / 40) % 2 ? 0 : 40; x < W; x += 80) ctx.fillRect(x, y, 40, 40)
-  // center rug
-  ctx.fillStyle = '#7c5cff33'
-  ctx.fillRect(280, 180, 400, 240)
-  ctx.strokeStyle = '#7c5cff88'
-  ctx.strokeRect(280, 180, 400, 240)
-  // desks
-  ctx.fillStyle = '#3b2f2f'
-  for (const [x, y] of [[120, 120], [700, 120], [120, 440], [700, 440]]) {
-    ctx.fillRect(x, y, 140, 60)
-    ctx.fillStyle = '#151a45'
-    ctx.fillRect(x + 10, y + 10, 120, 40)
-    ctx.fillStyle = '#3b2f2f'
+// ---------- office painting ----------
+function drawWall(x, y, w, h) {
+  ctx.fillStyle = '#10142e'
+  ctx.fillRect(x, y, w, h)
+  ctx.fillStyle = '#5b619c'
+  ctx.fillRect(x, y, w, Math.min(4, h))
+  ctx.fillStyle = '#3d4276'
+  ctx.fillRect(x, y + h - 3, w, 3)
+}
+
+function drawFurn(t, x, y, w, h, extra) {
+  if (t === 'rug') {
+    ctx.fillStyle = extra
+    ctx.fillRect(x, y, w, h)
+    ctx.strokeStyle = '#ffffff22'
+    ctx.lineWidth = 2
+    ctx.strokeRect(x + 4, y + 4, w - 8, h - 8)
+    return
   }
-  ctx.fillStyle = '#34d39955'
-  for (const [x, y] of [[30, 30], [900, 30], [30, 540], [900, 540]]) {
+  if (t === 'plant') {
+    ctx.fillStyle = '#7c4a21'
+    ctx.fillRect(x + 3, y + 10, 14, 10)
+    ctx.fillStyle = '#22c55e'
     ctx.beginPath()
-    ctx.arc(x, y, 16, 0, 7)
+    ctx.arc(x + 10, y + 7, 8, 0, 7)
     ctx.fill()
+    ctx.fillStyle = '#16a34a'
+    ctx.beginPath()
+    ctx.arc(x + 5, y + 4, 5, 0, 7)
+    ctx.arc(x + 15, y + 4, 5, 0, 7)
+    ctx.fill()
+    return
+  }
+  if (t === 'chair') {
+    ctx.fillStyle = '#11132a'
+    ctx.fillRect(x - 2, y - 2, 32, 32)
+    ctx.fillStyle = '#7c5cff'
+    ctx.beginPath()
+    ctx.arc(x + 14, y + 16, 10, 0, 7)
+    ctx.fill()
+    ctx.fillStyle = '#4a3fa3'
+    ctx.fillRect(x + 4, y + 2, 20, 6)
+    return
+  }
+  if (t === 'desk') {
+    ctx.fillStyle = '#11132a'
+    ctx.fillRect(x - 2, y - 2, 154, 74)
+    ctx.fillStyle = '#8b5a2b'
+    ctx.fillRect(x, y, 150, 70)
+    ctx.fillStyle = '#a06a35'
+    ctx.fillRect(x, y, 150, 8)
+    ctx.fillStyle = '#1f2937'
+    ctx.fillRect(x + 60, y + 8, 44, 30)
+    ctx.fillStyle = '#7dd3fc'
+    ctx.fillRect(x + 63, y + 11, 38, 24)
+    ctx.fillStyle = '#1f2937'
+    ctx.fillRect(x + 76, y + 38, 12, 8)
+    ctx.fillStyle = '#e5e7eb'
+    ctx.fillRect(x + 20, y + 48, 40, 10)
+    return
+  }
+  if (t === 'shelf') {
+    ctx.fillStyle = '#5b3a1e'
+    ctx.fillRect(x, y, w, h)
+    const cols = ['#ef4444', '#f59e0b', '#10b981', '#3b82f6', '#a855f7']
+    for (let bx = x + 4, i = 0; bx < x + w - 8; bx += 12, i++) {
+      ctx.fillStyle = cols[i % cols.length]
+      ctx.fillRect(bx, y + 4, 8, h - 8)
+    }
+    return
+  }
+  if (t === 'board') {
+    ctx.fillStyle = '#e8eafc'
+    ctx.fillRect(x, y, w, h)
+    ctx.strokeStyle = '#94a3b8'
+    ctx.lineWidth = 2
+    ctx.strokeRect(x, y, w, h)
+    ctx.strokeStyle = '#3b82f6'
+    ctx.beginPath()
+    ctx.moveTo(x + 12, y + h - 10)
+    ctx.lineTo(x + 60, y + 10)
+    ctx.lineTo(x + 110, y + h - 12)
+    ctx.stroke()
+    ctx.strokeStyle = '#ef4444'
+    ctx.beginPath()
+    ctx.arc(x + 170, y + h / 2, 10, 0, 7)
+    ctx.stroke()
+    return
+  }
+  if (t === 'tv') {
+    ctx.fillStyle = '#11132a'
+    ctx.fillRect(x - 2, y - 2, w + 4, h + 24)
+    ctx.fillStyle = '#0b0e24'
+    ctx.fillRect(x, y, w, h)
+    ctx.fillStyle = '#312e81'
+    ctx.fillRect(x + 6, y + 6, w - 12, h - 12)
+    ctx.fillStyle = '#5b3a1e'
+    ctx.fillRect(x, y + h, w, 20)
+    return
+  }
+  if (t === 'fridge') {
+    ctx.fillStyle = '#cbd5e1'
+    ctx.fillRect(x, y, w, h)
+    ctx.fillStyle = '#94a3b8'
+    ctx.fillRect(x, y + h / 2 - 1, w, 2)
+    ctx.fillRect(x + w - 10, y + 8, 4, 18)
+    return
+  }
+  if (t === 'counterH' || t === 'counterV') {
+    ctx.fillStyle = '#e2e8f0'
+    ctx.fillRect(x, y, w, h)
+    ctx.fillStyle = '#94a3b8'
+    ctx.fillRect(x, y + h - 6, w, 6)
+    if (t === 'counterH') {
+      ctx.fillStyle = '#38bdf8'
+      ctx.fillRect(x + 210, y + 8, 50, 28) // sink
+      ctx.fillStyle = '#1f2937'
+      for (const sx of [40, 80]) for (const sy of [10, 28]) {
+        ctx.beginPath()
+        ctx.arc(x + sx, y + sy, 7, 0, 7)
+        ctx.fill()
+      }
+    }
+    return
+  }
+  const top = t === 'ctableBig' ? '#4a3566' : '#6d4c2f'
+  ctx.fillStyle = '#11132a'
+  ctx.fillRect(x - 2, y - 2, w + 4, h + 4)
+  ctx.fillStyle = top
+  ctx.fillRect(x, y, w, h)
+  ctx.fillStyle = '#ffffff14'
+  ctx.fillRect(x, y, w, 6)
+  if (t.startsWith('sofa')) {
+    ctx.fillStyle = '#7c5cff'
+    if (t === 'sofaH') {
+      ctx.fillRect(x + 6, y + 8, w - 12, h - 16)
+      ctx.fillStyle = '#5a3fd4'
+      ctx.fillRect(x + 6, y + 8, 4, h - 16)
+      ctx.fillRect(x + w - 10, y + 8, 4, h - 16)
+      ctx.fillRect(x + w / 2 - 2, y + 8, 4, h - 16)
+    } else {
+      ctx.fillRect(x + 8, y + 6, w - 16, h - 12)
+      ctx.fillStyle = '#5a3fd4'
+      ctx.fillRect(x + 8, y + 6, w - 16, 4)
+      ctx.fillRect(x + 8, y + h - 10, w - 16, 4)
+      ctx.fillRect(x + 8, y + h / 2 - 2, w - 16, 4)
+    }
+    return
+  }
+  ctx.strokeStyle = '#ffffff22'
+  ctx.lineWidth = 2
+  ctx.strokeRect(x + 8, y + 8, w - 16, h - 16)
+}
+
+function drawOffice() {
+  ctx.fillStyle = '#1a1f4b'
+  ctx.fillRect(cam.x - 20, cam.y - 20, VIEW.w + 40, VIEW.h + 40)
+  for (const f of floors) {
+    ctx.fillStyle = f.c
+    ctx.fillRect(f.x, f.y, f.w, f.h)
+  }
+  // kitchen tiles
+  ctx.fillStyle = '#ffffff0c'
+  let ri = 0
+  for (let ty = 1020; ty < 1540; ty += 40, ri++)
+    for (let tx = 1700 + (ri % 2 ? 0 : 40); tx < 2350; tx += 80) ctx.fillRect(tx, ty, 40, 40)
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'middle'
+  for (const f of floors) {
+    ctx.fillStyle = '#ffffff2e'
+    ctx.font = 'bold 30px system-ui'
+    ctx.fillText(f.label, f.lx, f.ly)
+  }
+  for (const [t, x, y, w, h, extra] of furn) {
+    const fw = w ?? 40
+    const fh = h ?? 40
+    if (x + fw < cam.x - 60 || x > cam.x + VIEW.w + 60 || y + fh < cam.y - 60 || y > cam.y + VIEW.h + 60) continue
+    drawFurn(t, x, y, w, h, extra)
+  }
+  for (const [x, y, w, h] of walls) {
+    if (x + w < cam.x - 40 || x > cam.x + VIEW.w + 40 || y + h < cam.y - 40 || y > cam.y + VIEW.h + 40) continue
+    drawWall(x, y, w, h)
   }
   ctx.fillStyle = '#9aa1d088'
   ctx.font = '12px system-ui'
-  ctx.fillText('walk close to talk · click or WASD to move', 330, 30)
+  ctx.fillText('walk close to talk · click or WASD to move', 330, 395)
+}
+
+const mini = $('mini')
+const mctx = mini.getContext('2d')
+function drawMini(all) {
+  const s = mini.width / WORLD.w
+  mctx.clearRect(0, 0, mini.width, mini.height)
+  mctx.fillStyle = '#12163a'
+  mctx.fillRect(0, 0, mini.width, mini.height)
+  for (const f of floors) {
+    mctx.fillStyle = f.c
+    mctx.fillRect(f.x * s, f.y * s, f.w * s, f.h * s)
+  }
+  for (const a of all) {
+    mctx.fillStyle = a.isMe ? '#fff' : '#34d399'
+    mctx.beginPath()
+    mctx.arc(a.x * s, a.y * s, a.isMe ? 3 : 2, 0, 7)
+    mctx.fill()
+  }
+  mctx.strokeStyle = '#ffffff88'
+  mctx.lineWidth = 1
+  mctx.strokeRect(cam.x * s, cam.y * s, VIEW.w * s, VIEW.h * s)
 }
 
 function drawHead(x, y, r, videoEl, initials) {
@@ -498,7 +744,11 @@ function tick(now) {
   const dt = Math.min(0.05, (now - last) / 1000)
   last = now
   if (! $('stage').hidden) {
-    // movement
+    // movement (axis-separated vs solids = slides along walls)
+    const step = (dx, dy) => {
+      if (dx && !hitsSolid(me.x + dx, me.y, BODY_R)) me.x += dx
+      if (dy && !hitsSolid(me.x, me.y + dy, BODY_R)) me.y += dy
+    }
     let vx = 0
     let vy = 0
     if (keys.has('w') || keys.has('arrowup')) vy -= 1
@@ -508,8 +758,7 @@ function tick(now) {
     me.moving = false
     if (vx || vy) {
       const n = Math.hypot(vx, vy)
-      me.x += (vx / n) * SPEED * dt
-      me.y += (vy / n) * SPEED * dt
+      step((vx / n) * SPEED * dt, (vy / n) * SPEED * dt)
       me.tx = me.ty = null
       me.moving = true
     } else if (me.tx !== null) {
@@ -519,14 +768,18 @@ function tick(now) {
       if (d < 4) {
         me.tx = me.ty = null
       } else {
-        me.x += (dx / d) * SPEED * dt
-        me.y += (dy / d) * SPEED * dt
+        step((dx / d) * SPEED * dt, (dy / d) * SPEED * dt)
         me.moving = true
       }
     }
-    me.x = Math.max(24, Math.min(W - 24, me.x))
-    me.y = Math.max(70, Math.min(H - 24, me.y))
+    me.x = Math.max(30, Math.min(WORLD.w - 30, me.x))
+    me.y = Math.max(40, Math.min(WORLD.h - 30, me.y))
     if (me.moving) me.walk += dt * 10
+    // camera follows avatar
+    const tx = Math.max(0, Math.min(WORLD.w - VIEW.w, me.x - VIEW.w / 2))
+    const ty = Math.max(0, Math.min(WORLD.h - VIEW.h, me.y - VIEW.h / 2))
+    cam.x += (tx - cam.x) * Math.min(1, dt * 6)
+    cam.y += (ty - cam.y) * Math.min(1, dt * 6)
     if (now - lastSent > 66 && ws?.readyState === 1) {
       send({ t: 'move', x: Math.round(me.x), y: Math.round(me.y) })
       lastSent = now
@@ -545,7 +798,9 @@ function tick(now) {
         } else p.moving = false
       }
     }
-    // render
+    // render (world coords under camera transform)
+    ctx.save()
+    ctx.translate(-Math.round(cam.x), -Math.round(cam.y))
     drawOffice()
     const all = [{ ...me, isMe: true, video: $('selfVideo') }]
     for (const p of peers.values()) all.push({ ...p, isMe: false, video: p.videoEl })
@@ -553,15 +808,17 @@ function tick(now) {
     const inCall = new Set()
     for (const p of peers.values()) if (dist(me, p) < TALK) inCall.add(p.id)
     for (const a of all) drawAvatar(a, a.video, a.isMe, a.isMe ? inCall.size > 0 : inCall.has(a.id))
+    ctx.restore()
+    drawMini(all)
     // bubbles follow avatar
     const r = canvas.getBoundingClientRect()
-    const sx = r.width / W
-    const sy = r.height / H
+    const sx = r.width / VIEW.w
+    const sy = r.height / VIEW.h
     for (const { el, pid } of bubbles.values()) {
       const p = pid === myId ? me : peers.get(pid)
       if (!p) continue
-      el.style.left = `${p.x * sx}px`
-      el.style.top = `${(p.y - 78) * sy}px`
+      el.style.left = `${(p.x - cam.x) * sx}px`
+      el.style.top = `${(p.y - 78 - cam.y) * sy}px`
     }
     // call HUD
     const pill = $('callLabel')

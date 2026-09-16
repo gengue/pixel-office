@@ -3,6 +3,9 @@
 Pixel avatars (man, woman, orc, lizard, robot, ghost) + your live webcam as the head.
 Move with WASD/arrows or click. Proximity voice over WebRTC (walk up to talk). Chat with links + bubbles.
 
+World is 2400x1600 with camera follow + minimap. Zones: lobby, open office (desks),
+meeting room, lounge, kitchen. Walls and furniture collide.
+
 ## run
 
 ```bash

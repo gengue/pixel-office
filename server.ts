@@ -30,8 +30,11 @@ const tabs = new Map<string, any>() // tabId -> ws (one tab = one player)
 let seq = 0
 
 function spawnPoint(): { x: number; y: number } {
-  return { x: 120 + Math.random() * 720, y: 140 + Math.random() * 380 }
+  return { x: 70 + Math.random() * 100, y: 330 + Math.random() * 60 }
 }
+
+const WORLD_W = 2400
+const WORLD_H = 1600
 
 function broadcast(msg: unknown, except?: string) {
   const raw = JSON.stringify(msg)
@@ -100,8 +103,8 @@ const server = Bun.serve<SockData>({
         return
       }
       if (msg.t === 'move') {
-        me.x = Math.max(0, Math.min(960, Number(msg.x) || me.x))
-        me.y = Math.max(0, Math.min(600, Number(msg.y) || me.y))
+        me.x = Math.max(24, Math.min(WORLD_W - 24, Number(msg.x) || me.x))
+        me.y = Math.max(40, Math.min(WORLD_H - 24, Number(msg.y) || me.y))
         broadcast({ t: 'peer-move', id: ws.data.id, x: me.x, y: me.y }, ws.data.id)
         return
       }
