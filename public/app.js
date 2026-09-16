@@ -78,7 +78,30 @@ const ctx = canvas.getContext('2d')
 ctx.imageSmoothingEnabled = false
 
 // ---------- lobby ----------
+const store = {
+  get() {
+    try {
+      return JSON.parse(localStorage.getItem('po-profile') ?? '{}')
+    } catch {
+      return {}
+    }
+  },
+  set(p) {
+    try {
+      localStorage.setItem('po-profile', JSON.stringify(p))
+    } catch {}
+  },
+}
 let picked = 'hombre'
+{
+  const saved = store.get()
+  if (BODY_KINDS.includes(saved.body)) picked = saved.body
+  if (typeof saved.name === 'string' && saved.name.trim()) {
+    $('name').value = saved.name.slice(0, 24)
+  }
+}
+const saveProfile = () => store.set({ name: $('name').value.trim(), body: picked })
+$('name').addEventListener('input', saveProfile)
 const bodiesEl = $('bodies')
 for (const kind of BODY_KINDS) {
   const b = document.createElement('button')
@@ -93,6 +116,7 @@ for (const kind of BODY_KINDS) {
     picked = kind
     bodiesEl.querySelectorAll('.bodyOpt').forEach((el) => el.classList.remove('sel'))
     b.classList.add('sel')
+    saveProfile()
   }
   bodiesEl.append(b)
 }
@@ -433,6 +457,7 @@ $('joinBtn').onclick = async () => {
   const btn = $('joinBtn')
   if (btn.disabled) return
   if (ws && ws.readyState <= 1) return // join already in progress
+  saveProfile()
   btn.disabled = true
   btn.textContent = 'joining…'
   $('lobbyErr').textContent = ''
