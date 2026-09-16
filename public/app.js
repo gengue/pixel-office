@@ -40,7 +40,7 @@ let myId = null
 const tabId =
   sessionStorage.getItem('po-tab') ?? crypto.randomUUID?.() ?? String(Math.random())
 sessionStorage.setItem('po-tab', tabId)
-const me = { name: 'anon', body: picked, country: '', x: 480, y: 320, tx: null, ty: null, walk: 0, moving: false }
+const me = { name: 'anon', body: picked, country: '', hand: false, x: 480, y: 320, tx: null, ty: null, walk: 0, moving: false }
 const peers = new Map() // id -> {id,name,body,x,y,walk,moving,videoEl}
 const pcs = new Map() // id -> RTCPeerConnection
 const keys = new Set()
@@ -194,6 +194,13 @@ function connect() {
         }
       }
       refreshRoster()
+    } else if (m.t === 'peer-hand') {
+      if (m.id === myId) return
+      const p = peers.get(m.id)
+      if (p) {
+        p.hand = !!m.hand
+        refreshRoster()
+      }
     } else if (m.t === 'chat') {
       addHistory(m.name, m.text, m.at)
       addBubble(m.id, m.text)
@@ -205,7 +212,7 @@ function connect() {
 
 function upsertPeer(p) {
   if (!peers.has(p.id)) peers.set(p.id, { ...p, tx: p.x, ty: p.y, walk: 0, moving: false, videoEl: null })
-  else Object.assign(peers.get(p.id), { name: p.name, body: p.body, country: p.country ?? '' })
+  else Object.assign(peers.get(p.id), { name: p.name, body: p.body, country: p.country ?? '', hand: !!p.hand })
 }
 
 const send = (o) => ws?.readyState === 1 && ws.send(JSON.stringify(o))
@@ -363,6 +370,11 @@ addEventListener('beforeunload', () => {
 })
 
 $('leaveBtn').onclick = () => location.reload()
+$('handBtn').onclick = (e) => {
+  me.hand = !me.hand
+  send({ t: 'hand', hand: me.hand })
+  e.target.textContent = me.hand ? 'lower hand' : 'raise hand'
+}
 $('muteBtn').onclick = (e) => {
   muted = !muted
   localStream?.getAudioTracks().forEach((t) => (t.enabled = !muted))
@@ -450,8 +462,8 @@ function drawAvatar(p, videoEl, isMe, inCall) {
   ctx.ellipse(cx, bodyY + 64, 26, 7, 0, 0, 7)
   ctx.fill()
   if (inCall) {
-    ctx.strokeStyle = '#34d399'
-    ctx.lineWidth = 3
+    ctx.strokeStyle = 'rgba(52,211,153,0.45)'
+    ctx.lineWidth = 2
     ctx.beginPath()
     ctx.arc(cx, bodyY + 10, 52, 0, 7)
     ctx.stroke()
@@ -473,6 +485,10 @@ function drawAvatar(p, videoEl, isMe, inCall) {
   ctx.textAlign = 'center'
   ctx.textBaseline = 'middle'
   ctx.fillText(label, cx, ny + 11)
+  if (p.hand) {
+    ctx.font = '22px system-ui'
+    ctx.fillText('✋', cx + tw / 2 + 12, ny + 8)
+  }
 }
 
 let last = performance.now()
@@ -584,7 +600,7 @@ function refreshRoster() {
     const li = document.createElement('li')
     const near = p.self ? false : dist(me, p) < TALK
     li.innerHTML = `<span><i class="dot${near ? ' talk' : ''}"></i></span><span class="kind"></span>`
-    li.firstChild.append(document.createTextNode(`${flag(p.country)} ${p.name}`.trim()))
+    li.firstChild.append(document.createTextNode(`${p.hand ? '✋ ' : ''}${flag(p.country)} ${p.name}`.trim()))
     li.querySelector('.kind').textContent = p.self ? BODIES[me.body].label : BODIES[p.body]?.label ?? p.body
     ul.append(li)
   }

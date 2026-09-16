@@ -21,7 +21,7 @@ function serveFile(path: string) {
   })
 }
 
-type Player = { id: string; name: string; body: string; country: string; x: number; y: number }
+type Player = { id: string; name: string; body: string; country: string; hand: boolean; x: number; y: number }
 type SockData = { id: string; player: Player; tab?: string }
 
 const sockets = new Set<any>()
@@ -92,6 +92,7 @@ const server = Bun.serve<SockData>({
         me.body = String(msg.body ?? 'hombre').slice(0, 24)
         const cc = String(msg.country ?? '').toUpperCase().slice(0, 2)
         me.country = /^[A-Z]{2}$/.test(cc) ? cc : ''
+        me.hand = false
         if (typeof msg.x === 'number') me.x = msg.x
         if (typeof msg.y === 'number') me.y = msg.y
         ws.send(JSON.stringify({ t: 'welcome', id: ws.data.id, roster: roster() }))
@@ -102,6 +103,11 @@ const server = Bun.serve<SockData>({
         me.x = Math.max(0, Math.min(960, Number(msg.x) || me.x))
         me.y = Math.max(0, Math.min(600, Number(msg.y) || me.y))
         broadcast({ t: 'peer-move', id: ws.data.id, x: me.x, y: me.y }, ws.data.id)
+        return
+      }
+      if (msg.t === 'hand') {
+        me.hand = !!msg.hand
+        broadcast({ t: 'peer-hand', id: ws.data.id, hand: me.hand })
         return
       }
       if (msg.t === 'chat') {
