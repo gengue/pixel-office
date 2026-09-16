@@ -137,17 +137,20 @@ export const BODIES = {
 
 export const BODY_KINDS = Object.keys(BODIES)
 
-export function drawBody(ctx, kind, px, py, scale = 4, walk = 0) {
+export function drawBody(ctx, kind, px, py, scale = 4, walk = 0, sitting = false) {
   const def = BODIES[kind] ?? BODIES.hombre
   const pal = { ...def.palette, ...(def.extra ?? {}) }
-  const bob = Math.abs(Math.sin(walk)) * 2
+  const bob = sitting ? 0 : Math.abs(Math.sin(walk)) * 2
   for (let r = 0; r < def.rows.length; r++) {
+    // Fold the legs into a short seated pose, preserving each body's palette.
+    if (sitting && r >= 10 && r <= 12) continue
+    const rowY = sitting && r > 12 ? r - 3 : r
     const row = def.rows[r]
     for (let c = 0; c < row.length; c++) {
       const ch = row[c]
       if (ch === '.' || ch === ' ') continue
       ctx.fillStyle = pal[ch] ?? '#fff'
-      ctx.fillRect(Math.round(px + c * scale), Math.round(py + r * scale - bob), scale, scale)
+      ctx.fillRect(Math.round(px + c * scale), Math.round(py + rowY * scale - bob), scale, scale)
     }
   }
 }

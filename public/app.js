@@ -1,4 +1,7 @@
 import { BODIES, BODY_KINDS, drawBody, renderPreview } from './avatars.js'
+import { createOfficeArt } from './office-art.js'
+import { createSeats, findSeat } from './seating.js'
+import { addRemoteIce, setRemoteDescription } from './rtc.js'
 
 const WORLD = { w: 2400, h: 1600 }
 const VIEW = { w: 960, h: 600 }
@@ -17,14 +20,15 @@ function hitsSolid(px, py, r) {
 
 // ---------- office layout ----------
 const floors = [
-  { x: 40, y: 40, w: 580, h: 380, c: '#2b3170', label: 'LOBBY', lx: 330, ly: 72 },
-  { x: 680, y: 60, w: 1040, h: 820, c: '#262c66', label: 'OPEN OFFICE', lx: 1200, ly: 112 },
-  { x: 1800, y: 80, w: 540, h: 460, c: '#3a2b5c', label: 'MEETING', lx: 2070, ly: 128 },
-  { x: 60, y: 1000, w: 600, h: 540, c: '#28493c', label: 'LOUNGE', lx: 360, ly: 1052 },
-  { x: 1700, y: 1020, w: 650, h: 520, c: '#3d3a4a', label: 'KITCHEN', lx: 2090, ly: 1078 },
+  { x: 40, y: 40, w: 580, h: 380, c: '#d9d4c1', label: 'WELCOME LOUNGE', lx: 330, ly: 340 },
+  { x: 680, y: 60, w: 1040, h: 820, c: '#a8bbb2', label: 'THE STUDIO', lx: 1200, ly: 440 },
+  { x: 1800, y: 80, w: 540, h: 460, c: '#b9b3c9', label: 'MEETING ROOM', lx: 2070, ly: 162 },
+  { x: 60, y: 1000, w: 600, h: 540, c: '#b9c4a6', label: 'THE READING ROOM', lx: 360, ly: 1052 },
+  { x: 1700, y: 1020, w: 650, h: 520, c: '#d5ddca', label: 'COFFEE & COMPANY', lx: 2090, ly: 1078 },
 ]
 const walls = [
   [0, 0, 2400, 24], [0, 1576, 2400, 24], [0, 0, 24, 1600], [2376, 0, 24, 1600],
+  [24, 24, 1756, 100],
   [1780, 60, 580, 20], [1780, 60, 20, 220], [1780, 380, 20, 180],
   [2340, 60, 20, 500], [1780, 540, 220, 20], [2100, 540, 260, 20],
   [700, 940, 200, 20], [1000, 940, 400, 20], [1500, 940, 200, 20],
@@ -32,37 +36,49 @@ const walls = [
 // furn: [type, x, y, w, h, extra]
 const furn = [
   ['rug', 120, 120, 360, 200, '#7c5cff33'],
-  ['sofaH', 150, 140, 130, 52], ['sofaH', 350, 140, 130, 52], ['ctable', 270, 225, 80, 44],
-  ['plant', 560, 80], ['plant', 80, 350],
-  ['desk', 820, 220], ['desk', 1120, 220], ['desk', 1420, 220],
-  ['desk', 820, 560], ['desk', 1120, 560], ['desk', 1420, 560],
+  ['sofaH', 150, 140, 130, 52], ['sofaH', 350, 140, 130, 52, 'tealSofa'], ['ctable', 270, 260, 80, 44, 'bistro'],
+  ['plant', 540, 145, 28, 24, 'palm'], ['plant', 70, 145, 24, 20, 'snake'],
+  ['desk', 820, 220], ['desk', 1120, 220, 150, 70, 'laptopDesk'], ['desk', 1420, 220],
+  ['desk', 820, 560, 150, 70, 'laptopDesk'], ['desk', 1120, 560], ['desk', 1420, 560, 150, 70, 'laptopDesk'],
   ['chair', 881, 312], ['chair', 1181, 312], ['chair', 1481, 312],
   ['chair', 881, 652], ['chair', 1181, 652], ['chair', 1481, 652],
-  ['shelf', 1500, 80, 200, 26],
-  ['plant', 700, 100], ['plant', 1700, 100], ['plant', 700, 840], ['plant', 1700, 840],
+  ['shelf', 1500, 140, 200, 26],
+  ['plant', 1730, 165, 26, 22, 'rubber'],
+  ['planter', 1640, 360, 100, 26], ['planter', 1640, 700, 100, 26],
   ['rug', 1850, 150, 440, 300, '#ffffff10'],
   ['ctableBig', 1920, 245, 300, 120],
   ['chair', 1970, 197], ['chair', 2070, 197], ['chair', 2170, 197],
   ['chair', 1970, 389], ['chair', 2070, 389], ['chair', 2170, 389],
   ['chair', 1878, 283], ['chair', 2228, 283],
   ['board', 1980, 88, 220, 40],
-  ['plant', 2290, 470],
+  ['plant', 2280, 465, 28, 24, 'palm'], ['plant', 2300, 165, 24, 20, 'snake'],
   ['rug', 140, 1100, 380, 300, '#7c5cff22'],
-  ['sofaV', 150, 1130, 54, 200], ['sofaV', 466, 1130, 54, 200], ['ctable', 234, 1200, 132, 60],
-  ['shelf', 120, 1476, 240, 26], ['tv', 420, 1450, 150, 30],
-  ['plant', 600, 1040], ['plant', 90, 1490],
-  ['counterH', 1740, 1100, 300, 44], ['counterV', 1740, 1100, 44, 260],
+  ['armchair', 150, 1150, 68, 48, 'mustardChair'], ['armchair', 450, 1150, 68, 48],
+  ['armchair', 150, 1310, 68, 48], ['armchair', 450, 1310, 68, 48, 'mustardChair'],
+  ['ctable', 260, 1230, 130, 64, 'bistro'],
+  ['shelf', 120, 1476, 240, 26], ['sideboard', 420, 1450, 150, 36],
+  ['plant', 590, 1120, 26, 22, 'rubber'], ['plant', 90, 1390, 24, 20, 'fern'],
+  ['counterH', 1740, 1150, 220, 44], ['counterH', 1740, 1370, 108, 44],
   ['fridge', 2280, 1060, 56, 64],
   ['dtable', 1980, 1260, 180, 90],
-  ['chair', 2020, 1212], ['chair', 2100, 1212], ['chair', 2020, 1378], ['chair', 2100, 1378],
-  ['plant', 2300, 1470],
+  ['chair', 2020, 1212, 28, 28, 'diningChair'], ['chair', 2100, 1212, 28, 28, 'diningChair'],
+  ['chair', 2020, 1378, 28, 28, 'diningChair'], ['chair', 2100, 1378, 28, 28, 'diningChair'],
+  ['plant', 2280, 1480, 24, 20, 'flowers'], ['water', 2210, 1090, 38, 34],
+  ['rug', 820, 1090, 650, 390, '#b6c6ba'],
+  ['sofaH', 1000, 1160, 180, 66, 'tealSofa'],
+  ['ctable', 1020, 1280, 140, 66],
+  ['sofaH', 1000, 1420, 180, 66],
+  ['plant', 860, 1180, 28, 24, 'palm'], ['plant', 1380, 1190, 24, 20, 'fern'],
+  ['plant', 1390, 1440, 24, 20, 'flowers'],
+  ['shelf', 830, 1470, 130, 26],
+  ['tv', 380, 590, 150, 40], ['sideboard', 80, 610, 180, 36],
+  ['plant', 560, 610, 24, 20, 'snake'],
 ]
 for (const [x, y, w, h] of walls) solid(x, y, w, h)
-const chairs = furn.filter(([t]) => t === 'chair').map(([, x, y]) => ({ x: x + 14, y: y + 14 }))
-const SIT_RANGE = 36
+const seats = createSeats(furn)
 for (const [t, x, y, w, h] of furn) {
-  if (t === 'plant') solid(x, y, 20, 20)
-  else if (t === 'board' || t === 'shelf' || t === 'fridge') solid(x, y, w, h)
+  if (t === 'plant') solid(x, y, w ?? 20, h ?? 20)
+  else if (['board', 'shelf', 'fridge', 'tv', 'armchair', 'planter', 'sideboard', 'water'].includes(t)) solid(x, y, w, h)
   else if (t.includes('table') || t === 'desk' || t.startsWith('sofa') || t.startsWith('counter')) {
     solid(x, y, t === 'desk' ? 150 : w, t === 'desk' ? 70 : h)
   }
@@ -76,6 +92,18 @@ const $ = (id) => document.getElementById(id)
 const canvas = $('map')
 const ctx = canvas.getContext('2d')
 ctx.imageSmoothingEnabled = false
+const officeArt = createOfficeArt(WORLD, floors, walls, furn)
+new ResizeObserver(([entry]) => {
+  const { width, height } = entry.contentRect
+  if (!width || !height) return
+  // Reveal more of the world as the viewport grows, without stretching sprites.
+  const scale = Math.max(1, width / WORLD.w, height / WORLD.h)
+  VIEW.w = canvas.width = Math.max(1, Math.round(width / scale))
+  VIEW.h = canvas.height = Math.max(1, Math.round(height / scale))
+  ctx.imageSmoothingEnabled = false
+  cam.x = Math.max(0, Math.min(WORLD.w - VIEW.w, cam.x))
+  cam.y = Math.max(0, Math.min(WORLD.h - VIEW.h, cam.y))
+}).observe($('canvasWrap'))
 
 // ---------- lobby ----------
 const store = {
@@ -306,7 +334,10 @@ function connect() {
       addHistory(m.name, m.text, m.at)
       addBubble(m.id, m.text)
     } else if (m.t === 'signal') {
-      onSignal(m.from, m.data)
+      onSignal(m.from, m.data).catch((error) => {
+        console.warn('Call negotiation failed:', error.name)
+        closePC(m.from)
+      })
     }
   }
 }
@@ -319,7 +350,7 @@ function upsertPeer(p) {
 const send = (o) => ws?.readyState === 1 && ws.send(JSON.stringify(o))
 
 // ---------- WebRTC mesh gated by proximity ----------
-const rtcCfg = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] }
+let rtcCfg = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] }
 
 function ensurePC(pid) {
   if (pcs.has(pid) || !localStream || !myId) return pcs.get(pid)
@@ -331,14 +362,18 @@ function ensurePC(pid) {
   }
   pc.ontrack = (e) => attachRemote(pid, e.streams[0])
   pc.onconnectionstatechange = () => {
-    if (['failed', 'closed', 'disconnected'].includes(pc.connectionState)) closePC(pid)
+    if (pc.connectionState === 'failed') closePC(pid)
   }
   return pc
 }
 
 function closePC(pid) {
-  pcs.get(pid)?.close()
+  const pc = pcs.get(pid)
   pcs.delete(pid)
+  if (pc) {
+    pc.onconnectionstatechange = null
+    pc.close()
+  }
   const p = peers.get(pid)
   if (p?.videoEl) {
     p.videoEl.srcObject = null
@@ -348,7 +383,7 @@ function closePC(pid) {
 }
 
 async function maybeCall(pid) {
-  if (myId === null || pid <= myId) return // only highest id initiates
+  if (myId === null || pid <= myId) return // Only the lower ID initiates.
   const pc = ensurePC(pid)
   if (!pc || pc.signalingState !== 'stable') return
   const offer = await pc.createOffer()
@@ -361,14 +396,16 @@ async function onSignal(from, d) {
   if (d.kind === 'offer') {
     const pc = ensurePC(from)
     if (!pc) return
-    await pc.setRemoteDescription(d.sdp)
+    await setRemoteDescription(pc, d.sdp)
     const ans = await pc.createAnswer()
     await pc.setLocalDescription(ans)
     send({ t: 'signal', to: from, data: { kind: 'answer', sdp: ans } })
   } else if (d.kind === 'answer') {
-    await pcs.get(from)?.setRemoteDescription(d.sdp).catch(() => {})
+    const pc = pcs.get(from)
+    if (pc) await setRemoteDescription(pc, d.sdp)
   } else if (d.kind === 'ice' && d.c) {
-    await pcs.get(from)?.addIceCandidate(d.c).catch(() => {})
+    const pc = ensurePC(from)
+    if (pc) await addRemoteIce(pc, d.c)
   }
 }
 
@@ -391,8 +428,8 @@ setInterval(() => {
   for (const [id, p] of peers) {
     const d = dist(me, p)
     if (d < LINK && localStream) {
-      if (!pcs.has(id)) maybeCall(id)
-      if (p.videoEl) p.videoEl.volume = muted ? 0 : Math.max(0, 1 - d / TALK)
+      if (!pcs.has(id)) maybeCall(id).catch(() => closePC(id))
+      if (p.videoEl) p.videoEl.volume = Math.max(0, 1 - d / TALK)
     } else if (d > LINK + 90) {
       closePC(id)
     }
@@ -400,11 +437,15 @@ setInterval(() => {
 }, 1200)
 
 // ---------- sitting ----------
+let seatReturn = null
+const nearbySeat = () => findSeat(seats, me, [...peers.values()], (x, y) => hitsSolid(x, y, BODY_R))
 function sendSit() {
   send({ t: 'sit', sitting: me.sitting, x: Math.round(me.x), y: Math.round(me.y) })
 }
 function standUp() {
   if (!me.sitting) return
+  if (seatReturn) Object.assign(me, seatReturn)
+  seatReturn = null
   me.sitting = false
   sendSit()
 }
@@ -413,20 +454,15 @@ function toggleSit() {
     standUp()
     return
   }
-  let best = null
-  let bd = SIT_RANGE
-  for (const c of chairs) {
-    const d = Math.hypot(me.x - c.x, me.y - c.y)
-    if (d < bd) {
-      bd = d
-      best = c
-    }
-  }
+  const best = nearbySeat()
   if (!best) return
+  seatReturn = { x: me.x, y: me.y }
   me.x = best.x
   me.y = best.y
   me.tx = me.ty = null
   me.sitting = true
+  me.moving = false
+  me.walk = 0
   send({ t: 'move', x: Math.round(me.x), y: Math.round(me.y) })
   sendSit()
 }
@@ -437,7 +473,7 @@ addEventListener('keydown', (e) => {
   if (document.activeElement === $('chatInput')) return
   if (e.key.toLowerCase() === 'e') {
     e.preventDefault()
-    toggleSit()
+    if (!e.repeat) toggleSit()
     return
   }
   if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' '].includes(e.key)) e.preventDefault()
@@ -498,6 +534,14 @@ $('joinBtn').onclick = async () => {
     }
   }
   setStatus('connecting…', true)
+  try {
+    const response = await fetch('/rtc-config', { signal: AbortSignal.timeout(10000) })
+    if (!response.ok) throw new Error('rtc-config')
+    rtcCfg = await response.json()
+  } catch {
+    failJoin('Could not configure voice/video. Please try again.')
+    return
+  }
   await Promise.race([countryReady, new Promise((r) => setTimeout(r, 1200))])
   connect()
   setTimeout(() => {
@@ -518,6 +562,7 @@ addEventListener('beforeunload', () => {
 })
 
 $('leaveBtn').onclick = () => location.reload()
+$('sitBtn').onclick = toggleSit
 $('handBtn').onclick = (e) => {
   me.hand = !me.hand
   send({ t: 'hand', hand: me.hand })
@@ -730,12 +775,13 @@ const mctx = mini.getContext('2d')
 function drawMini(all) {
   const s = mini.width / WORLD.w
   mctx.clearRect(0, 0, mini.width, mini.height)
-  mctx.fillStyle = '#12163a'
+  mctx.fillStyle = '#e5d1b3'
   mctx.fillRect(0, 0, mini.width, mini.height)
   for (const f of floors) {
     mctx.fillStyle = f.c
     mctx.fillRect(f.x * s, f.y * s, f.w * s, f.h * s)
   }
+  if (officeArt.ready) mctx.drawImage(officeArt.overview, 0, 0, mini.width, mini.height)
   for (const a of all) {
     mctx.fillStyle = a.isMe ? '#fff' : '#34d399'
     mctx.beginPath()
@@ -784,11 +830,11 @@ function drawAvatar(p, videoEl, isMe, inCall) {
   const bw = 12 * s
   const headR = 22
   const cx = p.x
-  const bodyY = p.y - 8 + (p.sitting ? 12 : 0)
+  const bodyY = p.y - (p.sitting ? 32 : 8)
   // shadow
   ctx.fillStyle = '#00000055'
   ctx.beginPath()
-  ctx.ellipse(cx, bodyY + 64, 26, 7, 0, 0, 7)
+  ctx.ellipse(cx, bodyY + (p.sitting ? 48 : 64), 26, 7, 0, 0, 7)
   ctx.fill()
   if (inCall) {
     ctx.strokeStyle = 'rgba(52,211,153,0.45)'
@@ -797,13 +843,13 @@ function drawAvatar(p, videoEl, isMe, inCall) {
     ctx.arc(cx, bodyY + 10, 52, 0, 7)
     ctx.stroke()
   }
-  drawBody(ctx, p.body, cx - bw / 2, bodyY, s, p.walk)
+  drawBody(ctx, p.body, cx - bw / 2, bodyY, s, p.walk, p.sitting)
   drawHead(cx, bodyY - headR + 6, headR, videoEl, initialsOf(p.name || '?'))
   // nametag
   ctx.font = 'bold 12px system-ui'
   const label = `${p.name}${isMe ? ' (you)' : ''}`
   const tw = ctx.measureText(label).width + 14
-  ctx.fillStyle = isMe ? '#7c5cff' : '#0d1030dd'
+  ctx.fillStyle = isMe ? '#427461' : '#2c4138ee'
   ctx.strokeStyle = '#111'
   const ny = bodyY - headR * 2 - 16
   ctx.beginPath()
@@ -885,15 +931,27 @@ function tick(now) {
     // render (world coords under camera transform)
     ctx.save()
     ctx.translate(-Math.round(cam.x), -Math.round(cam.y))
-    drawOffice()
+    if (officeArt.ready) officeArt.ground(ctx)
+    else drawOffice()
     const all = [{ ...me, isMe: true, video: $('selfVideo') }]
     for (const p of peers.values()) all.push({ ...p, isMe: false, video: p.videoEl })
     all.sort((a, b) => a.y - b.y)
     const inCall = new Set()
-    for (const p of peers.values()) if (dist(me, p) < TALK) inCall.add(p.id)
-    for (const a of all) drawAvatar(a, a.video, a.isMe, a.isMe ? inCall.size > 0 : inCall.has(a.id))
+    for (const p of peers.values()) {
+      if (dist(me, p) < TALK && pcs.get(p.id)?.connectionState === 'connected' && p.videoEl?.readyState >= 2) inCall.add(p.id)
+    }
+    // Paint furniture and people in depth order so walking behind a desk feels natural.
+    const scene = officeArt.ready
+      ? [...officeArt.objects.map((object) => ({ object, depth: object.bottom })), ...all.map((avatar) => ({ avatar, depth: avatar.y + 56 }))].sort((a, b) => a.depth - b.depth)
+      : all.map((avatar) => ({ avatar }))
+    for (const { object, avatar } of scene) {
+      if (object) officeArt.draw(ctx, object)
+      else drawAvatar(avatar, avatar.video, avatar.isMe, avatar.isMe ? inCall.size > 0 : inCall.has(avatar.id))
+    }
     ctx.restore()
     drawMini(all)
+    $('sitBtn').hidden = !me.sitting && !nearbySeat()
+    $('sitBtn').textContent = me.sitting ? 'E · Stand up' : 'E · Sit down'
     // bubbles follow avatar
     const r = canvas.getBoundingClientRect()
     const sx = r.width / VIEW.w
@@ -910,7 +968,7 @@ function tick(now) {
       pill.textContent = `in call · ${inCall.size}`
       pill.classList.add('on')
     } else {
-      pill.textContent = 'not in call'
+      pill.textContent = [...peers.values()].some((p) => dist(me, p) < TALK) ? 'connecting audio/video…' : 'not in call'
       pill.classList.remove('on')
     }
   }

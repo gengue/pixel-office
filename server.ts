@@ -1,5 +1,6 @@
 import { readFileSync, existsSync, statSync } from 'node:fs'
 import { join, extname } from 'node:path'
+import { getRTCConfig } from './rtc-config'
 
 const PORT = Number(process.env.PORT ?? 3000)
 const PUB = join(import.meta.dir, 'public')
@@ -52,8 +53,17 @@ function roster() {
 
 const server = Bun.serve<SockData>({
   port: PORT,
+  hostname: process.env.HOST ?? '0.0.0.0',
   async fetch(req, srv) {
     const url = new URL(req.url)
+    if (url.pathname === '/rtc-config') {
+      try {
+        return Response.json(await getRTCConfig(), { headers: { 'Cache-Control': 'no-store' } })
+      } catch (error) {
+        console.error('RTC configuration unavailable:', error instanceof Error ? error.message : 'unknown')
+        return new Response('Voice/video service unavailable', { status: 503 })
+      }
+    }
     if (url.pathname === '/ws') {
       const id = `u${Date.now().toString(36)}${(seq++).toString(36)}${Math.floor(Math.random() * 1e4).toString(36)}`
       const upgraded = srv.upgrade(req, { data: { id, player: { id, name: '', body: 'hombre', ...spawnPoint() } } })
@@ -77,6 +87,7 @@ const server = Bun.serve<SockData>({
       } catch {
         return
       }
+      if (!msg || typeof msg !== 'object' || Array.isArray(msg)) return
       const me = ws.data.player
       if (msg.t === 'join') {
         const tab = String(msg.tab ?? '')
