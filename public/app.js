@@ -5,6 +5,7 @@ const H = 600
 const TALK = 220
 const LINK = 330
 const SPEED = 210
+const HEAD_ZOOM = 1.7 // face crop: higher = tighter on face, less background
 
 const $ = (id) => document.getElementById(id)
 const canvas = $('map')
@@ -373,8 +374,11 @@ function drawHead(x, y, r, videoEl, initials) {
   if (videoEl?.readyState >= 2) {
     const vw = videoEl.videoWidth || 320
     const vh = videoEl.videoHeight || 240
-    const s = Math.max((r * 2) / vw, (r * 2) / vh)
-    ctx.drawImage(videoEl, x - (vw * s) / 2, y - (vh * s) / 2, vw * s, vh * s)
+    // zoom-in on face: enlarge frame and focus upper-middle where faces sit
+    const s = (Math.max((r * 2) / vw, (r * 2) / vh) * HEAD_ZOOM)
+    const fx = vw * 0.5
+    const fy = vh * 0.38
+    ctx.drawImage(videoEl, x - fx * s, y - fy * s, vw * s, vh * s)
   } else {
     ctx.fillStyle = '#3a4170'
     ctx.fillRect(x - r, y - r, r * 2, r * 2)
