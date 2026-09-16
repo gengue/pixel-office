@@ -5,7 +5,7 @@ const H = 600
 const TALK = 220
 const LINK = 330
 const SPEED = 210
-const HEAD_ZOOM = 1.7 // face crop: higher = tighter on face, less background
+const HEAD_ZOOM = 1.45 // face crop: higher = tighter on face, less background
 
 const $ = (id) => document.getElementById(id)
 const canvas = $('map')
