@@ -38,10 +38,14 @@ test('four-person room enforces capacity on join, movement and sitting, and rele
     for (let i = 0; i < 4; i++) occupants.push(await join(`Member ${i}`, { tab: `member-tab-${i}` }))
     const linked = await join('Meeting link', { destination: '?room=meeting' })
     expect(linked.welcome.roster.find((p) => p.id === linked.id)).toMatchObject(ROOMS.find((r) => r.alias === 'meeting').arrival)
+    expect(linked.welcome.teleported).toBe(true)
+    expect((await wait(() => occupants[0].messages.find((m) => m.t === 'peer-join' && m.player.id === linked.id))).teleported).toBe(true)
+    expect(occupants[0].welcome.teleported).toBe(false)
     const coordinates = await join('Coordinates', { destination: '?x=1200&y=900' })
     expect(coordinates.welcome.roster.find((p) => p.id === coordinates.id)).toMatchObject({ x: 1200, y: 900 })
     for (const destination of ['?room=huddle', '?x=1940&y=810', '?room=unknown']) {
       const guest = await join('Link guest', { destination })
+      expect(guest.welcome.teleported).toBe(false)
       expect(guest.welcome.notice).toBeTruthy()
       expect(roomAt(guest.welcome.roster.find((p) => p.id === guest.id))).toBe(0)
     }

@@ -161,8 +161,8 @@ const server = Bun.serve<SockData>({
         const arrival = resolveArrival(msg.destination, roster().filter((p) => p.name), me.id)
         if (arrival?.point) movePlayer(ws, arrival.point.x, arrival.point.y)
         else if (!arrival) movePlayer(ws, msg.x, msg.y)
-        ws.send(JSON.stringify({ t: 'welcome', id: ws.data.id, roster: roster(), notice: arrival?.notice }))
-        broadcast({ t: 'peer-join', player: me }, ws.data.id)
+        ws.send(JSON.stringify({ t: 'welcome', id: ws.data.id, roster: roster(), notice: arrival?.notice, teleported: !!arrival?.point }))
+        broadcast({ t: 'peer-join', player: me, teleported: !!arrival?.point }, ws.data.id)
         updateShares()
         return
       }

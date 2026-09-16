@@ -122,3 +122,5 @@ small groups. Seats avoid occupied positions on the client but simultaneous clai
 are not arbitrated by the server. Camera capture targets 320×240 to limit bandwidth.
 
 Click a person in **People** to walk quickly beside them, following a free route around walls and furniture. Select them again, press Esc, or move manually to cancel. Full rooms remain inaccessible.
+
+Successful meeting-link arrivals play a brief cyan teleport portal, beam, and particle effect for the arriving person and connected peers. Reduced-motion mode uses a short static halo.

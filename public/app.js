@@ -1,3 +1,4 @@
+import { drawTeleport } from './teleport.js'
 import { pathToPerson } from './navigation.js'
 import { WORLD, BODY_R, walls, furn, hitsSolid } from './world.js'
 import { parseDestination, meetingURL } from './meeting-links.js'
@@ -14,6 +15,10 @@ import { setupMusic, musicVolume } from './music.js'
 const VIEW = { w: 960, h: 600 }
 const cam = { x: 0, y: 0 }
 const seats = createSeats(furn)
+const arrivals = new Map()
+function markArrival(p) {
+  arrivals.set(p.id, { x: p.x, y: p.y, started: performance.now() })
+}
 const SPEED = 210
 const HEAD_ZOOM = 1.45 // face crop: higher = tighter on face, less background
 
@@ -241,6 +246,7 @@ function connect() {
   ws.onerror = () => failJoin('Could not reach the server. Check your connection and try again.')
   ws.onclose = () => {
     cancelVisit()
+    arrivals.clear()
     screenShare.reset()
     music.pause()
     stopDancing()
@@ -259,9 +265,13 @@ function connect() {
       cam.x = Math.max(0, Math.min(WORLD.w - VIEW.w, me.x - VIEW.w / 2))
       cam.y = Math.max(0, Math.min(WORLD.h - VIEW.h, me.y - VIEW.h / 2))
       enterStage()
+      if (m.teleported) markArrival(me)
       if (m.notice) showRoomNotice(m.notice)
     } else if (m.t === 'peer-join') {
-      if (m.player.id !== myId) upsertPeer(m.player)
+      if (m.player.id !== myId) {
+        upsertPeer(m.player)
+        if (m.teleported) markArrival(m.player)
+      }
       refreshRoster()
     } else if (m.t === 'peer-move') {
       if (m.id === myId) return
@@ -276,6 +286,7 @@ function connect() {
       showRoomNotice(`${m.room} is full`)
     } else if (m.t === 'peer-leave') {
       peers.delete(m.id)
+      arrivals.delete(m.id)
       closePC(m.id)
       for (const [bid, b] of bubbles) {
         if (b.pid === m.id) {
@@ -1135,6 +1146,9 @@ function tick(now) {
     for (const { object, avatar } of scene) {
       if (object) officeArt.draw(ctx, object)
       else drawAvatar(avatar, avatar.video, avatar.isMe, avatar.isMe ? inCall.size > 0 : inCall.has(avatar.id), now)
+    }
+    for (const [id, arrival] of arrivals) {
+      if (!drawTeleport(ctx, arrival, now, reducedMotion.matches)) arrivals.delete(id)
     }
     ctx.restore()
     drawMini(all)
