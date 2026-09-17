@@ -16,7 +16,7 @@ test('office atlas loads before use and every furniture crop stays within the im
   try {
     const types = ['desk', 'chair', 'plant', 'shelf', 'ctable', 'ctableBig', 'fridge', 'counterH', 'sofaH', 'sofaV', 'tv', 'board', 'dtable', 'rug', 'armchair', 'planter', 'sideboard', 'water', 'toilet', 'vanity']
     const furniture = types.map((type) => [type, 100, 300, 150, 70])
-    for (const [type, variant] of [['plant', 'snake'], ['plant', 'palm'], ['plant', 'rubber'], ['plant', 'fern'], ['plant', 'flowers'], ['sofaH', 'tealSofa'], ['chair', 'diningChair'], ['armchair', 'mustardChair'], ['ctable', 'bistro'], ['desk', 'laptopDesk'], ['sofaH', 'gardenBench'], ['plant', 'olive'], ['planter', 'herbPlanter'], ['ctable', 'parasol']])
+    for (const [type, variant] of [['plant', 'snake'], ['plant', 'palm'], ['plant', 'rubber'], ['plant', 'fern'], ['plant', 'flowers'], ['sofaH', 'tealSofa'], ['chair', 'diningChair'], ['armchair', 'mustardChair'], ['ctable', 'bistro'], ['desk', 'laptopDesk'], ['sofaH', 'gardenBench'], ['plant', 'olive'], ['planter', 'herbPlanter'], ['ctable', 'parasol'], ['shelf', 'studioArchive'], ['shelf', 'readingLibrary'], ['sideboard', 'welcomeConsole']])
       furniture.push([type, 100, 300, 150, 70, variant])
     const art = createOfficeArt({ w: 2400, h: 1600 }, [], [], furniture)
     expect(art.ready).toBe(false)
@@ -28,6 +28,9 @@ test('office atlas loads before use and every furniture crop stays within the im
     expect(art.ready).toBe(false)
     expect(atlases[2].src).toBe('/assets/office-outdoors.png')
     atlases[2].onload()
+    expect(art.ready).toBe(false)
+    expect(atlases[3].src).toBe('/assets/office-storage.png')
+    atlases[3].onload()
     expect(art.ready).toBe(true)
     for (const object of art.objects) art.draw(context, object)
     const spriteDraws = draws.filter(([source]) => atlases.includes(source))

@@ -35,7 +35,7 @@ export const furn = [
   ['desk', 820, 560, 150, 70, 'laptopDesk'], ['desk', 1120, 560], ['desk', 1420, 560, 150, 70, 'laptopDesk'],
   ['chair', 881, 312], ['chair', 1181, 312], ['chair', 1481, 312],
   ['chair', 881, 652], ['chair', 1181, 652], ['chair', 1481, 652],
-  ['shelf', 1500, 140, 200, 26],
+  ['shelf', 1500, 140, 200, 26, 'studioArchive'],
   ['plant', 1730, 165, 26, 22, 'rubber'],
   ['planter', 1640, 360, 100, 26], ['planter', 1640, 700, 100, 26],
   ['rug', 1850, 150, 440, 300, '#ffffff10'],
@@ -49,7 +49,7 @@ export const furn = [
   ['armchair', 150, 1150, 68, 48, 'mustardChair'], ['armchair', 450, 1150, 68, 48],
   ['armchair', 150, 1310, 68, 48], ['armchair', 450, 1310, 68, 48, 'mustardChair'],
   ['ctable', 260, 1230, 130, 64, 'bistro'],
-  ['shelf', 120, 1476, 240, 26], ['sideboard', 420, 1450, 150, 36],
+  ['shelf', 120, 1476, 240, 26, 'readingLibrary'], ['sideboard', 420, 1450, 150, 36],
   ['plant', 590, 1120, 26, 22, 'rubber'], ['plant', 90, 1390, 24, 20, 'fern'],
   ['counterH', 1740, 1150, 220, 44], ['counterH', 1740, 1370, 108, 44],
   ['fridge', 2280, 1060, 56, 64],
@@ -67,7 +67,7 @@ export const furn = [
   ['ctableBig', 2000, 780, 170, 70],
   ['chair', 2000, 735], ['chair', 2110, 735], ['chair', 2000, 860], ['chair', 2110, 860],
   ['plant', 2215, 735, 24, 20, 'snake'],
-  ['tv', 380, 590, 150, 40], ['sideboard', 80, 610, 180, 36],
+  ['tv', 380, 590, 150, 40], ['sideboard', 80, 610, 180, 36, 'welcomeConsole'],
   ['plant', 560, 610, 24, 20, 'snake'],
 ]
 for (const [x, y, w, h] of walls) solid(x, y, w, h)

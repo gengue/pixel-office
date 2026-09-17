@@ -22,12 +22,18 @@ const outdoorRegions = {
   gardenBench: [1004, 150, 460, 334], parasol: [58, 518, 375, 450],
   olive: [538, 500, 370, 470], herbPlanter: [968, 580, 535, 365],
 }
+const storageRegions = {
+  welcomeConsole: [30, 435, 483, 430],
+  studioArchive: [540, 320, 457, 545],
+  readingLibrary: [1024, 175, 508, 690],
+}
 const plantSizes = { snake: [36, 96], palm: [86, 112], rubber: [58, 94], fern: [62, 56], flowers: [44, 52], olive: [90, 116] }
 
 export function createOfficeArt(world, floors, walls, furniture) {
   const image = new Image()
   const variety = new Image()
   const outdoors = new Image()
+  const storage = new Image()
   const ground = document.createElement('canvas')
   ground.width = world.w
   ground.height = world.h
@@ -127,7 +133,7 @@ export function createOfficeArt(world, floors, walls, furniture) {
     }
     else if (t === 'desk') sprite(art, x, y + 70, 150, art === 'laptopDesk' ? 102 : 126)
     else if (t === 'chair') sprite(art, x - (variant ? 5 : 11), y + 36, variant ? 38 : 50, 66)
-    else if (t === 'shelf') sprite(t, x, y + h, w, 122)
+    else if (t === 'shelf') sprite(art, x, y + h, w, art === 'readingLibrary' ? 180 : art === 'studioArchive' ? 150 : 122)
     else if (t === 'sofaH') sprite(art, x, y + h, w, art === 'gardenBench' ? 130 : 96)
     else if (t === 'armchair') sprite(variant || 'sofaV', x, y + h, w, 76)
     else if (t === 'planter' || t === 'sideboard') sprite(art, x, y + h, w, Math.round(w * (art === 'herbPlanter' ? 0.68 : 0.82)))
@@ -157,11 +163,12 @@ export function createOfficeArt(world, floors, walls, furniture) {
   function drawSprite(ctx, object, scale = 1) {
     const extra = varietyRegions[object.type]
     const outdoor = outdoorRegions[object.type]
-    ctx.drawImage(outdoor ? outdoors : extra ? variety : image, ...(outdoor || extra || regions[object.type]), object.x * scale, object.y * scale, object.w * scale, object.h * scale)
+    const cabinet = storageRegions[object.type]
+    ctx.drawImage(cabinet ? storage : outdoor ? outdoors : extra ? variety : image, ...(cabinet || outdoor || extra || regions[object.type]), object.x * scale, object.y * scale, object.w * scale, object.h * scale)
   }
   let loaded = 0
-  image.onload = variety.onload = outdoors.onload = () => {
-    if (++loaded < 3) return
+  image.onload = variety.onload = outdoors.onload = storage.onload = () => {
+    if (++loaded < 4) return
     const m = overview.getContext('2d')
     m.drawImage(ground, 0, 0, overview.width, overview.height)
     for (const object of objects) drawSprite(m, object, 0.1)
@@ -170,6 +177,7 @@ export function createOfficeArt(world, floors, walls, furniture) {
   image.src = '/assets/office-atlas.png'
   variety.src = '/assets/office-variety.png'
   outdoors.src = '/assets/office-outdoors.png'
+  storage.src = '/assets/office-storage.png'
 
   return {
     get ready() { return ready },
