@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <title>Pixel Office</title>
+  <path fill="#315d4d" d="M4 0h24v4h4v24h-4v4H4v-4H0V4h4z"/>
+  <path fill="#f4ead3" d="M8 6h16v22H8z"/>
+  <path fill="#9bb7a1" d="M11 10h4v4h-4zm7 0h3v4h-3zm-7 7h4v3h-4zm7 0h3v3h-3z"/>
+  <path fill="#d7a354" d="M14 23h4v5h-4z"/>
+  <path fill="#203e34" d="M6 28h20v2H6z"/>
+</svg>

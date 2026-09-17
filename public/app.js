@@ -408,6 +408,9 @@ function updateMeetingLink() {
   $('meetingURL').value = meetingURL(location.href, target === 'position' ? me : target)
   $('meetingCopyStatus').textContent = ''
 }
+function rememberMeetingDestination(value) {
+  try { localStorage.setItem('po-meeting-destination', value) } catch {}
+}
 for (const button of document.querySelectorAll('.meetingLinkBtn')) button.onclick = () => {
   keys.clear()
   me.tx = me.ty = null
@@ -415,7 +418,10 @@ for (const button of document.querySelectorAll('.meetingLinkBtn')) button.onclic
   $('meetingDestination').replaceChildren(...rooms.map((room) => new Option(room.label.toLowerCase(), room.alias)))
   if (myId) $('meetingDestination').add(new Option('My current position', 'position'))
   const current = rooms.find((room) => me.x >= room.x && me.x < room.x + room.w && me.y >= room.y && me.y < room.y + room.h)
-  $('meetingDestination').value = current?.alias ?? 'meeting'
+  let remembered
+  try { remembered = localStorage.getItem('po-meeting-destination') } catch {}
+  $('meetingDestination').value = [...$('meetingDestination').options].some((option) => option.value === remembered)
+    ? remembered : current?.alias ?? 'meeting'
   updateMeetingLink()
   cancelVisit()
   $('meetingDialog').showModal()
@@ -423,10 +429,13 @@ for (const button of document.querySelectorAll('.meetingLinkBtn')) button.onclic
 $('closeMeeting').onclick = () => $('meetingDialog').close()
 $('meetingDestination').onchange = updateMeetingLink
 $('meetingURL').onfocus = (event) => event.target.select()
+$('meetingURL').addEventListener('copy', () => rememberMeetingDestination($('meetingDestination').value))
 $('copyMeeting').onclick = async () => {
   const link = $('meetingURL').value
+  const target = $('meetingDestination').value
   try {
     await navigator.clipboard.writeText(link)
+    rememberMeetingDestination(target)
     $('meetingCopyStatus').textContent = 'Link copied. Paste it into your calendar invitation.'
   } catch {
     $('meetingURL').focus()
