@@ -562,7 +562,7 @@ function showRoomNotice(text) {
 function canMoveTo(x, y) {
   const full = fullRoomAt({ ...me, x, y }, [...peers.values()])
   if (full) { showRoomNotice(`${full.label} is full`); me.tx = me.ty = null }
-  return !full && !hitsSolid(x, y, BODY_R)
+  return !full && (me.body === 'fantasma' || !hitsSolid(x, y, BODY_R))
 }
 let seatReturn = null
 const nearbySeat = () => findSeat(seats, me, [...peers.values()], (x, y) => hitsSolid(x, y, BODY_R))
@@ -730,6 +730,15 @@ $('muteBtn').onclick = (e) => {
   e.currentTarget.textContent = muted ? 'Mic off' : 'Mic on'
   e.currentTarget.setAttribute('aria-pressed', String(muted))
   e.currentTarget.title = muted ? 'Unmute microphone' : 'Mute microphone'
+}
+$('cameraBtn').onclick = (e) => {
+  const tracks = localStream?.getVideoTracks() ?? []
+  if (!tracks.length) return
+  const off = tracks[0].enabled
+  tracks.forEach((track) => { track.enabled = !off })
+  e.currentTarget.textContent = off ? 'Camera off' : 'Camera on'
+  e.currentTarget.setAttribute('aria-pressed', String(off))
+  e.currentTarget.title = off ? 'Turn camera on' : 'Turn camera off'
 }
 $('chatForm').onsubmit = (e) => {
   e.preventDefault()

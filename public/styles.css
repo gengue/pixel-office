@@ -132,6 +132,8 @@ body:not(:has(#screenPanel:not([hidden]))) #reactionFeed { position: absolute; w
 .dockControls button::before { font-size: 22px; line-height: 1; }
 #muteBtn::before { content: '🎙'; }
 #muteBtn[aria-pressed="true"]::before { content: '🔇'; }
+#cameraBtn::before { content: '📹'; }
+#cameraBtn[aria-pressed="true"]::before { content: '⊘'; }
 #reactionBtn::before { content: '☺'; }
 #handBtn::before { content: '✋'; }
 #shareBtn::before { content: '▣'; }
@@ -139,7 +141,7 @@ body:not(:has(#screenPanel:not([hidden]))) #reactionFeed { position: absolute; w
 #leaveBtn::before { content: '↪'; }
 .dockControls .dockPrimary { background: #e5edde; border-color: #d3dfca; }
 #handBtn[aria-pressed="true"] { background: #fff0be; border-color: #c79431; }
-#muteBtn[aria-pressed="true"], #shareBtn[aria-pressed="true"] { background: #f9e3dc; color: #923e30; border-color: #d9a194; }
+#muteBtn[aria-pressed="true"], #cameraBtn[aria-pressed="true"], #shareBtn[aria-pressed="true"] { background: #f9e3dc; color: #923e30; border-color: #d9a194; }
 #leaveBtn { color: #a34839; }
 .dockDivider { width: 1px; height: 28px; background: var(--line); }
 #shareStatus:not(:empty) { margin-top: 6px; }

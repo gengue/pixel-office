@@ -16,11 +16,11 @@ export function clearSegment(a, b, blocked = hitsSolid) {
 
 // A fixed 16px grid is sufficient for this office's doorways.
 export function pathToPerson(start, target, occupants = []) {
-  const blocked = (x, y) => hitsSolid(x, y) || !!fullRoomAt({ id: start.id, x, y }, occupants)
+  const blocked = (x, y) => (start.body !== 'fantasma' && hitsSolid(x, y)) || !!fullRoomAt({ id: start.id, x, y }, occupants)
   const adjacent = (p) => {
     const d = Math.hypot(p.x - target.x, p.y - target.y)
-    return d >= 48 && d <= 80 && roomAt(p) === roomAt(target) && clearSegment(p, target,
-      (x, y) => walls.some(([wx, wy, w, h]) => x >= wx && x <= wx + w && y >= wy && y <= wy + h))
+    return d >= 48 && d <= 80 && roomAt(p) === roomAt(target) && (start.body === 'fantasma' || clearSegment(p, target,
+      (x, y) => walls.some(([wx, wy, w, h]) => x >= wx && x <= wx + w && y >= wy && y <= wy + h)))
   }
   if (blocked(start.x, start.y)) return null
   if (adjacent(start)) return []
