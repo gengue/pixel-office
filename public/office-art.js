@@ -34,6 +34,7 @@ export function createOfficeArt(world, floors, walls, furniture) {
   const variety = new Image()
   const outdoors = new Image()
   const storage = new Image()
+  const snacks = new Image()
   const ground = document.createElement('canvas')
   ground.width = world.w
   ground.height = world.h
@@ -141,7 +142,7 @@ export function createOfficeArt(world, floors, walls, furniture) {
     else if (t === 'vanity') sprite(t, x, y + h, w, 146)
     else if (art === 'parasol') sprite(art, x, y + h, w, 180)
     else if (t === 'water') sprite(t, x, y + h, w, 94)
-    else if (t === 'counterH') sprite(t, x, y + h, w, Math.round(w * 239 / 318))
+    else if (t === 'counterH') sprite(art, x, y + h, w, Math.round(w * (art === 'snackTrolley' ? 0.94 : 239 / 318)))
     else if (t === 'sofaV') {
       sprite(t, x - 5, y + 80, w + 10, 76)
       sprite(t, x - 5, y + h, w + 10, 76)
@@ -161,14 +162,18 @@ export function createOfficeArt(world, floors, walls, furniture) {
   overview.width = 240
   overview.height = 160
   function drawSprite(ctx, object, scale = 1) {
+    if (object.type === 'snackTrolley') {
+      ctx.drawImage(snacks, 160, 190, 965, 885, object.x * scale, object.y * scale, object.w * scale, object.h * scale)
+      return
+    }
     const extra = varietyRegions[object.type]
     const outdoor = outdoorRegions[object.type]
     const cabinet = storageRegions[object.type]
     ctx.drawImage(cabinet ? storage : outdoor ? outdoors : extra ? variety : image, ...(cabinet || outdoor || extra || regions[object.type]), object.x * scale, object.y * scale, object.w * scale, object.h * scale)
   }
   let loaded = 0
-  image.onload = variety.onload = outdoors.onload = storage.onload = () => {
-    if (++loaded < 4) return
+  image.onload = variety.onload = outdoors.onload = storage.onload = snacks.onload = () => {
+    if (++loaded < 5) return
     const m = overview.getContext('2d')
     m.drawImage(ground, 0, 0, overview.width, overview.height)
     for (const object of objects) drawSprite(m, object, 0.1)
@@ -178,6 +183,7 @@ export function createOfficeArt(world, floors, walls, furniture) {
   variety.src = '/assets/office-variety.png'
   outdoors.src = '/assets/office-outdoors.png'
   storage.src = '/assets/office-storage.png'
+  snacks.src = '/assets/snack-trolley.png'
 
   return {
     get ready() { return ready },

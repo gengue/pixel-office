@@ -29,7 +29,7 @@ function serveFile(path: string) {
   })
 }
 
-type Player = { id: string; name: string; body: string; appearance?: ReturnType<typeof normalizeAppearance>; country: string; hand: boolean; sitting: boolean; dancing: boolean; x: number; y: number }
+type Player = { id: string; name: string; body: string; appearance?: ReturnType<typeof normalizeAppearance>; country: string; hand: boolean; muted: boolean; sitting: boolean; dancing: boolean; x: number; y: number }
 type SockData = { id: string; player: Player; tab?: string; shareState?: string; lastReaction?: number }
 type ScreenShare = { id: string; owner: string; room: number }
 
@@ -161,6 +161,7 @@ const server = Bun.serve<SockData>({
         const cc = String(msg.country ?? '').toUpperCase().slice(0, 2)
         me.country = /^[A-Z]{2}$/.test(cc) ? cc : ''
         me.hand = false
+        me.muted = false
         me.sitting = false
         me.dancing = false
         const arrival = resolveArrival(msg.destination, roster().filter((p) => p.name), me.id)
@@ -181,6 +182,12 @@ const server = Bun.serve<SockData>({
       if (msg.t === 'hand') {
         me.hand = !!msg.hand
         broadcast({ t: 'peer-hand', id: ws.data.id, hand: me.hand })
+        return
+      }
+      if (msg.t === 'mute') {
+        if (!me.name || typeof msg.muted !== 'boolean') return
+        me.muted = msg.muted
+        broadcast({ t: 'peer-mute', id: ws.data.id, muted: me.muted })
         return
       }
       if (msg.t === 'sit') {

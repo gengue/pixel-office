@@ -4,8 +4,9 @@ const solids = []
 function solid(x, y, w, h) {
   solids.push({ x, y, w, h })
 }
-export function hitsSolid(px, py, r = BODY_R) {
+export function hitsSolid(px, py, r = BODY_R, ignored) {
   for (const s of solids) {
+    if (ignored && s.x === ignored.x && s.y === ignored.y && s.w === ignored.w && s.h === ignored.h) continue
     if (px + r > s.x && px - r < s.x + s.w && py + r > s.y && py - r < s.y + s.h) return true
   }
   return false
@@ -51,7 +52,7 @@ export const furn = [
   ['ctable', 260, 1230, 130, 64, 'bistro'],
   ['shelf', 120, 1476, 240, 26, 'readingLibrary'], ['sideboard', 420, 1450, 150, 36],
   ['plant', 590, 1120, 26, 22, 'rubber'], ['plant', 90, 1390, 24, 20, 'fern'],
-  ['counterH', 1740, 1150, 220, 44], ['counterH', 1740, 1370, 108, 44],
+  ['counterH', 1740, 1150, 220, 44], ['counterH', 1740, 1370, 108, 44, 'snackTrolley'],
   ['fridge', 2280, 1060, 56, 64],
   ['dtable', 1980, 1260, 180, 90],
   ['chair', 2020, 1212, 28, 28, 'diningChair'], ['chair', 2100, 1212, 28, 28, 'diningChair'],
