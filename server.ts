@@ -6,7 +6,7 @@ import { getRTCConfig } from './rtc-config'
 import { normalizeAppearance } from './public/avatars.js'
 import { REACTIONS } from './public/reactions.js'
 import { ROOMS, roomAt, fullRoomAt } from './public/rooms.js'
-import { canViewScreen, voiceVolume, LINK } from './public/voice.js'
+import { canViewScreen, canShareVoice, voiceVolume, LINK } from './public/voice.js'
 import { DEFAULT_VIDEO, musicPosition, musicVolume } from './public/music.js'
 
 const PORT = Number(process.env.PORT ?? 3000)
@@ -270,6 +270,7 @@ const server = Bun.serve<SockData>({
       if (msg.t === 'signal') {
         const target = byId.get(String(msg.to))
         if (me.name && target?.data.player.name && ['offer', 'answer', 'ice'].includes(msg.data?.kind) &&
+          canShareVoice(me, target.data.player, ROOMS) &&
           (voiceVolume(me, target.data.player, ROOMS) > 0 || Math.hypot(me.x - target.data.player.x, me.y - target.data.player.y) <= LINK + 90)) {
           target.send(JSON.stringify({ t: 'signal', from: ws.data.id, data: msg.data }))
         }

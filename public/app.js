@@ -6,7 +6,7 @@ import { BODIES, BODY_KINDS, OUTFIT_COLORS, ACCESSORIES, normalizeAppearance, dr
 import { createOfficeArt } from './office-art.js'
 import { createSeats, findSeat } from './seating.js'
 import { addRemoteIce, setRemoteDescription } from './rtc.js'
-import { LINK, voiceVolume } from './voice.js'
+import { LINK, canShareVoice, voiceVolume } from './voice.js'
 import { ROOMS as floors, fullRoomAt } from './rooms.js'
 import { REACTIONS } from './reactions.js'
 import { setupScreenShare } from './screen-share.js'
@@ -281,6 +281,8 @@ function connect() {
       if (p) {
         p.tx = m.x
         p.ty = m.y
+        if (!canShareVoice(me, peerPosition(p), floors)) closePC(m.id)
+        else if (p.videoEl) p.videoEl.volume = voiceVolume(me, peerPosition(p), floors)
       }
     } else if (m.t === 'move-blocked') {
       cancelVisit()
@@ -437,6 +439,8 @@ const screenShare = setupScreenShare({
   isConnected: () => ws?.readyState === 1 && !!myId && !$('stage').hidden,
 })
 
+const peerPosition = (p) => ({ x: p.tx ?? p.x, y: p.ty ?? p.y })
+
 function ensurePC(pid) {
   if (pcs.has(pid) || !localStream || !myId || !peers.has(pid)) return pcs.get(pid)
   const pc = new RTCPeerConnection(rtcCfg)
@@ -505,7 +509,7 @@ function attachRemote(pid, stream) {
     p.videoEl = v
   }
   p.videoEl.srcObject = stream
-  p.videoEl.volume = voiceVolume(me, p, floors)
+  p.videoEl.volume = voiceVolume(me, peerPosition(p), floors)
   p.videoEl.play().catch(() => {})
 }
 
@@ -513,7 +517,9 @@ setInterval(() => {
   if (!myId) return
   for (const [id, p] of peers) {
     const d = dist(me, p)
-    if ((d < LINK || voiceVolume(me, p, floors) > 0) && localStream) {
+    if (!canShareVoice(me, peerPosition(p), floors)) {
+      closePC(id)
+    } else if ((d < LINK || voiceVolume(me, peerPosition(p), floors) > 0) && localStream) {
       if (!pcs.has(id)) maybeCall(id).catch(() => closePC(id))
     } else if (d > LINK + 90) {
       closePC(id)
@@ -1137,7 +1143,7 @@ function tick(now) {
     all.sort((a, b) => a.y - b.y)
     const inCall = new Set()
     for (const p of peers.values()) {
-      const volume = voiceVolume(me, p, floors)
+      const volume = voiceVolume(me, peerPosition(p), floors)
       if (p.videoEl) p.videoEl.volume = volume
       if (volume > 0 && pcs.get(p.id)?.connectionState === 'connected' && p.videoEl?.readyState >= 2) inCall.add(p.id)
     }
@@ -1175,7 +1181,7 @@ function tick(now) {
       pill.textContent = `in call · ${inCall.size}`
       pill.classList.add('on')
     } else {
-      pill.textContent = [...peers.values()].some((p) => voiceVolume(me, p, floors) > 0) ? 'connecting audio/video…' : 'not in call'
+      pill.textContent = [...peers.values()].some((p) => voiceVolume(me, peerPosition(p), floors) > 0) ? 'connecting audio/video…' : 'not in call'
       pill.classList.remove('on')
     }
   }
@@ -1205,7 +1211,7 @@ function refreshRoster() {
   }
   for (const p of rows) {
     const li = document.createElement('li')
-    const near = p.self ? false : voiceVolume(me, p, floors) > 0
+    const near = p.self ? false : voiceVolume(me, peerPosition(p), floors) > 0
     li.innerHTML = `<span><i class="dot${near ? ' talk' : ''}"></i></span><span class="kind"></span>`
     li.firstChild.append(document.createTextNode(`${p.dancing ? '♫ ' : ''}${p.sitting ? '🪑 ' : ''}${p.hand ? '✋ ' : ''}${flag(p.country)} ${p.name}`.trim()))
     li.querySelector('.kind').textContent = p.self ? BODIES[me.body].label : BODIES[p.body]?.label ?? p.body
