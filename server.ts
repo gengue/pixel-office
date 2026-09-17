@@ -7,7 +7,7 @@ import { normalizeAppearance } from './public/avatars.js'
 import { REACTIONS } from './public/reactions.js'
 import { ROOMS, roomAt, fullRoomAt } from './public/rooms.js'
 import { canViewScreen, voiceVolume, LINK } from './public/voice.js'
-import { musicVolume } from './public/music.js'
+import { DEFAULT_VIDEO, musicPosition, musicVolume } from './public/music.js'
 
 const PORT = Number(process.env.PORT ?? 3000)
 const PUB = join(import.meta.dir, 'public')
@@ -37,7 +37,12 @@ const sockets = new Set<any>()
 const byId = new Map<string, any>()
 const tabs = new Map<string, any>() // tabId -> ws (one tab = one player)
 const shares = new Map<string, ScreenShare>()
+const music = { videoId: DEFAULT_VIDEO, playing: false, position: 0, updatedAt: Date.now(), revision: 0 }
 let seq = 0
+
+function musicSnapshot(requestAt?: number) {
+  return { t: 'music-state', ...music, serverNow: Date.now(), requestAt }
+}
 
 function spawnPoint(): { x: number; y: number } {
   return { x: 70 + Math.random() * 100, y: 330 + Math.random() * 60 }
@@ -162,6 +167,7 @@ const server = Bun.serve<SockData>({
         if (arrival?.point) movePlayer(ws, arrival.point.x, arrival.point.y)
         else if (!arrival) movePlayer(ws, msg.x, msg.y)
         ws.send(JSON.stringify({ t: 'welcome', id: ws.data.id, roster: roster(), notice: arrival?.notice, teleported: !!arrival?.point }))
+        ws.send(JSON.stringify(musicSnapshot()))
         broadcast({ t: 'peer-join', player: me, teleported: !!arrival?.point }, ws.data.id)
         updateShares()
         return
@@ -188,6 +194,32 @@ const server = Bun.serve<SockData>({
       if (msg.t === 'dance') {
         if (!me.name) return
         setDancing(ws, msg.dancing === true && !me.sitting && musicVolume(me) > 0)
+        return
+      }
+      if (msg.t === 'music-sync') {
+        if (me.name && typeof msg.requestAt === 'number' && Number.isFinite(msg.requestAt)) {
+          ws.send(JSON.stringify(musicSnapshot(msg.requestAt)))
+        }
+        return
+      }
+      if (msg.t === 'music-command') {
+        if (!me.name) return
+        if (musicVolume(me) <= 0 || !['play', 'pause', 'load', 'ended'].includes(msg.action) ||
+          (msg.action === 'load' && (typeof msg.videoId !== 'string' || !/^[\w-]{11}$/.test(msg.videoId))) ||
+          (msg.action === 'ended' && msg.revision !== music.revision)) {
+          ws.send(JSON.stringify({ t: 'music-error', message: 'Music controls require a nearby listener and a valid selection.' }))
+          return
+        }
+        const playing = msg.action === 'load' || msg.action === 'play'
+        if (playing !== music.playing || msg.action === 'load' || msg.action === 'ended') {
+          const now = Date.now()
+          music.position = msg.action === 'load' || msg.action === 'ended' ? 0 : musicPosition(music, now)
+          if (msg.action === 'load') music.videoId = msg.videoId
+          music.playing = playing
+          music.updatedAt = now
+          music.revision++
+        }
+        broadcast(musicSnapshot())
         return
       }
       if (msg.t === 'share-start') {

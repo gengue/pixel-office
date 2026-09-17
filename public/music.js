@@ -2,7 +2,7 @@ import { roomAt } from './rooms.js'
 
 // The turntable is already painted on the reading room's sideboard.
 export const RECORD_PLAYER = { x: 474, y: 1450 }
-const DEFAULT_VIDEO = 'ffnnMC-yMR0'
+export const DEFAULT_VIDEO = 'ffnnMC-yMR0'
 
 export function youtubeId(value) {
   try {
@@ -23,56 +23,128 @@ export function musicVolume(position) {
   return Math.round(50 * Math.max(0, Math.min(1, (320 - distance) / 240)))
 }
 
-export function setupMusic(getPosition) {
+export function musicPosition(state, now) {
+  return state.position + (state.playing ? Math.max(0, now - state.updatedAt) / 1000 : 0)
+}
+
+export function setupMusic({ getPosition, send, isConnected }) {
   const $ = (id) => document.getElementById(id)
+  const panel = $('musicPanel')
+  const open = $('musicOpen')
   const status = $('musicStatus')
   const play = $('musicPlay')
   const pause = $('musicPause')
-  let player, loading, ready = false, videoId = DEFAULT_VIDEO
-  let volume = 0, lastUpdate = 0
-  let request = 0
+  let player, loading, shared, clockOffset
+  let ready = false, nearby = false, dismissed = false, blocked = false, failed = false
+  let loadedId = '', pendingState = null, lastUpdate = -Infinity, lastSync = -Infinity, lastSeek = -Infinity
 
-  function stop() {
-    request++
-    if (ready) player.pauseVideo()
+  const audible = () => isConnected() && musicVolume(getPosition()) > 0 && !document.hidden && !panel.hidden && panel.getClientRects().length > 0
+
+  function pauseLocal() {
+    if (ready && [1, 3].includes(player.getPlayerState())) {
+      pendingState = 2
+      player.pauseVideo()
+    }
+  }
+
+  function command(action, videoId) {
+    if (!audible()) return
+    blocked = failed = false
+    const position = getPosition()
+    send({ t: 'move', x: Math.round(position.x), y: Math.round(position.y) })
+    send({ t: 'music-command', action, videoId, revision: shared?.revision })
+    if (action === 'play') update(true)
+  }
+
+  function synchronize() {
+    if (!ready || !shared || !audible()) { pauseLocal(); return }
+    const volume = musicVolume(getPosition())
+    if (player.getVolume() !== volume) player.setVolume(volume)
+    if (failed || blocked) return
+    const target = musicPosition(shared, performance.now() + clockOffset)
+    const state = player.getPlayerState()
+    if (state === pendingState) pendingState = null
+    if (loadedId !== shared.videoId) {
+      loadedId = shared.videoId
+      pendingState = shared.playing ? 1 : 5
+      const video = { videoId: loadedId, startSeconds: target }
+      if (shared.playing) { player.unMute(); player.loadVideoById(video) }
+      else player.cueVideoById(video)
+      return
+    }
+    if ([1, 2, 5].includes(state) && Math.abs(player.getCurrentTime() - target) > 0.75 && performance.now() - lastSeek > 1500) {
+      lastSeek = performance.now()
+      pendingState = shared.playing ? 1 : 2
+      player.seekTo(target, true)
+    }
+    if (shared.playing && ![1, 3].includes(state)) {
+      pendingState = 1
+      player.unMute()
+      player.playVideo()
+    } else if (!shared.playing) pauseLocal()
   }
 
   function update(force = false) {
-    if (!force && performance.now() - lastUpdate < 150) return
-    lastUpdate = performance.now()
-    volume = musicVolume(getPosition())
-    $('musicRange').textContent = volume ? `Volume ${volume}%` : 'Out of range'
-    if (document.hidden || !$('musicPanel').getClientRects().length) { stop(); return }
-    if (!ready) return
-    if (player.getVolume() !== volume) player.setVolume(volume)
+    const now = performance.now()
+    if (!force && now - lastUpdate < 250) return
+    lastUpdate = now
+    const near = isConnected() && musicVolume(getPosition()) > 0
+    if (near && !nearby) { dismissed = blocked = failed = false; lastSync = -Infinity }
+    nearby = near
+    panel.hidden = !near || dismissed
+    open.hidden = !near || !dismissed
+    pause.disabled = !shared?.playing
+    play.disabled = !shared
+    play.textContent = blocked && shared?.playing ? 'Listen' : 'Play'
+    $('musicRange').textContent = `Volume ${musicVolume(getPosition())}% · shared`
+    if (near && now - lastSync >= 5000) {
+      lastSync = now
+      send({ t: 'music-sync', requestAt: now })
+    }
+    if (!audible() || !shared) { pauseLocal(); return }
+    if (!ready && !loading && !failed) {
+      void load().then(() => update(true)).catch((error) => { failed = true; status.textContent = error.message })
+    }
+    synchronize()
   }
 
   function load() {
-    if (loading) return loading
+    status.textContent = 'Loading YouTube…'
     loading = new Promise((resolve, reject) => {
-      const timeout = setTimeout(() => reject(new Error('YouTube did not respond. Check your connection and try again.')), 15000)
+      const timeout = setTimeout(() => reject(new Error('YouTube did not respond.')), 15000)
       function create() {
         player = new window.YT.Player('youtubePlayer', {
-          width: '100%', height: 200, videoId,
-          playerVars: { playsinline: 1, origin: location.origin },
+          width: '100%', height: 200,
+          playerVars: { playsinline: 1, controls: 0, disablekb: 1, origin: location.origin },
           events: {
             onReady() {
               clearTimeout(timeout)
               ready = true
-              player.getIframe().title = 'Reading room YouTube music player'
-              update(true)
+              player.getIframe().title = 'Shared reading room music'
+              status.textContent = ''
               resolve()
             },
             onStateChange(event) {
-              pause.disabled = event.data !== 1 && event.data !== 3
-              if (event.data === 1) {
-                update(true)
-                status.textContent = 'Playing'
-              } else if (event.data === 2) status.textContent = 'Paused.'
-              else if (event.data === 0) status.textContent = 'Finished'
+              const commanded = pendingState !== null
+              if (event.data === pendingState) pendingState = null
+              if (!audible() || !shared) { pauseLocal(); return }
+              if (event.data === 1) { blocked = false; status.textContent = 'Playing' }
+              else if (event.data === 2) status.textContent = 'Paused'
+              if (player.getVideoData().video_id !== shared.videoId) return
+              if (event.data === 0 && shared.playing) {
+                const duration = player.getDuration()
+                if (!commanded || (duration > 0 && musicPosition(shared, performance.now() + clockOffset) >= duration - 0.75)) {
+                  pendingState = null
+                  command('ended')
+                }
+                return
+              }
+              if (commanded) return
+              if (event.data === 1 && !shared.playing) command('play')
+              else if (event.data === 2 && shared.playing) command('pause')
             },
-            onAutoplayBlocked() { status.textContent = 'Playback blocked by browser.' },
-            onError() { status.textContent = 'YouTube could not play this video. It may be unavailable or block embedding. Try another link.' },
+            onAutoplayBlocked() { blocked = true; play.textContent = 'Listen'; status.textContent = 'Playback blocked by browser.' },
+            onError() { failed = true; status.textContent = 'This video is unavailable or cannot be embedded.' },
           },
         })
       }
@@ -81,10 +153,7 @@ export function setupMusic(getPosition) {
         window.onYouTubeIframeAPIReady = create
         const script = document.createElement('script')
         script.src = 'https://www.youtube.com/iframe_api'
-        script.onerror = () => {
-          clearTimeout(timeout)
-          reject(new Error('Could not load YouTube. Check your connection and try again.'))
-        }
+        script.onerror = () => { clearTimeout(timeout); reject(new Error('Could not load YouTube.')) }
         document.head.append(script)
       }
     }).catch((error) => {
@@ -99,46 +168,45 @@ export function setupMusic(getPosition) {
     return loading
   }
 
-  async function start(id = videoId) {
-    const currentRequest = ++request
-    play.disabled = true
-    status.textContent = 'Loading YouTube…'
-    try {
-      await load()
-      update(true)
-      if (currentRequest !== request) return
-      player.unMute()
-      if (id !== videoId) { videoId = id; player.loadVideoById(id) }
-      else player.playVideo()
-      status.textContent = ''
-    } catch (error) { status.textContent = error.message }
-    finally { play.disabled = false }
-  }
-
-  play.onclick = () => start()
-  pause.onclick = stop
+  play.onclick = () => command('play')
+  pause.onclick = () => command('pause')
   $('musicClose').onclick = () => {
-    stop()
-    status.textContent = 'Paused.'
-    $('musicPanel').hidden = true
-    $('musicOpen').hidden = false
-    $('musicOpen').focus()
+    dismissed = true
+    update(true)
+    open.focus()
   }
-  $('musicOpen').onclick = () => {
-    $('musicPanel').hidden = false
-    $('musicOpen').hidden = true
-    $('musicPlay').focus()
+  open.onclick = () => {
+    dismissed = blocked = failed = false
+    update(true)
+    play.focus()
   }
   $('musicForm').onsubmit = (event) => {
     event.preventDefault()
     const id = youtubeId($('musicUrl').value)
-    if (!id) { status.textContent = 'Enter a valid YouTube video link (youtube.com or youtu.be).'; return }
-    void start(id)
+    if (!id) { status.textContent = 'Enter a valid YouTube video link.'; return }
+    command('load', id)
   }
-  $('musicDefault').onclick = () => { $('musicUrl').value = ''; void start(DEFAULT_VIDEO) }
+  $('musicDefault').onclick = () => { $('musicUrl').value = ''; command('load', DEFAULT_VIDEO) }
   document.addEventListener('visibilitychange', () => update(true))
+  update(true)
   return {
     update,
-    pause: stop,
+    onMessage(message) {
+      if (message.t === 'music-error') { status.textContent = message.message; return }
+      if (shared && message.revision < shared.revision) return
+      const now = performance.now()
+      if (typeof message.requestAt === 'number') clockOffset = message.serverNow - (message.requestAt + now) / 2
+      else if (clockOffset === undefined) clockOffset = message.serverNow - now
+      if (shared?.revision !== message.revision) { failed = false; status.textContent = '' }
+      shared = message
+      update(true)
+    },
+    reset() {
+      shared = undefined
+      clockOffset = undefined
+      loadedId = ''
+      pauseLocal()
+      update(true)
+    },
   }
 }

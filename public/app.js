@@ -119,7 +119,7 @@ const tabId =
   sessionStorage.getItem('po-tab') ?? crypto.randomUUID?.() ?? String(Math.random())
 sessionStorage.setItem('po-tab', tabId)
 const me = { name: 'anon', body: picked, appearance, country: '', hand: false, sitting: false, dancing: false, x: 120, y: 360, tx: null, ty: null, walk: 0, moving: false, motion: 0, facing: 1 }
-const music = setupMusic(() => me)
+const music = setupMusic({ getPosition: () => me, send: (message) => send(message), isConnected: () => !!myId && ws?.readyState === 1 })
 const peers = new Map() // id -> {id,name,body,x,y,walk,moving,videoEl}
 window.__po = { me, cam, peers, WORLD, VIEW }
 const pcs = new Map() // id -> RTCPeerConnection
@@ -248,7 +248,7 @@ function connect() {
     cancelVisit()
     arrivals.clear()
     screenShare.reset()
-    music.pause()
+    music.reset()
     stopDancing()
     if (!$('stage').hidden && !myId) failJoin('Connection lost before entering. Try again.')
   }
@@ -267,6 +267,8 @@ function connect() {
       enterStage()
       if (m.teleported) markArrival(me)
       if (m.notice) showRoomNotice(m.notice)
+    } else if (m.t === 'music-state' || m.t === 'music-error') {
+      music.onMessage(m)
     } else if (m.t === 'peer-join') {
       if (m.player.id !== myId) {
         upsertPeer(m.player)
@@ -706,7 +708,7 @@ addEventListener('beforeunload', () => {
   } catch {}
 })
 
-$('leaveBtn').onclick = () => { music.pause(); screenShare.reset(); location.reload() }
+$('leaveBtn').onclick = () => { music.reset(); screenShare.reset(); location.reload() }
 $('sitBtn').onclick = toggleSit
 $('danceBtn').onclick = toggleDance
 $('handBtn').onclick = (e) => {

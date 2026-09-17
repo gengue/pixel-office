@@ -23,15 +23,17 @@ test('record player has medium volume nearby, fades with distance and cannot rea
   expect(musicVolume({ x: 670, y: 1450 })).toBe(0)
 })
 
-for (const action of ['disconnect', 'close player']) test(`${action} cancels a play request while YouTube is still loading`, async () => {
+test('music is hidden away from the turntable, joins the shared position and closes only for this listener', async () => {
   const original = Object.fromEntries(['document', 'window', 'location'].map((key) => [key, Object.getOwnPropertyDescriptor(globalThis, key)]))
   const nodes = new Map()
-  let events, playRequests = 0
+  let events, playerState = -1, time = 0, connected = true
+  let position = { x: 120, y: 360 }
+  const loads = [], sent = []
   const globals = {
     document: {
       hidden: false, addEventListener() {},
       getElementById(id) {
-        if (!nodes.has(id)) nodes.set(id, { getClientRects: () => [{}], focus() {} })
+        if (!nodes.has(id)) nodes.set(id, { getClientRects() { return this.hidden ? [] : [{}] }, focus() {} })
         return nodes.get(id)
       },
     },
@@ -40,25 +42,65 @@ for (const action of ['disconnect', 'close player']) test(`${action} cancels a p
       constructor(_id, options) { events = options.events }
       getIframe() { return {} }
       getVolume() { return 50 }
+      setVolume() {}
       unMute() {}
-      pauseVideo() {}
-      playVideo() { playRequests++ }
+      getPlayerState() { return playerState }
+      getCurrentTime() { return time }
+      getDuration() { return 100 }
+      getVideoData() { return { video_id: loads.at(-1)?.videoId } }
+      pauseVideo() { playerState = 2; events.onStateChange({ data: 2 }) }
+      playVideo() { playerState = 1; events.onStateChange({ data: 1 }) }
+      loadVideoById(video) { loads.push(video); time = video.startSeconds; playerState = 1 }
+      cueVideoById(video) { loads.push(video); time = video.startSeconds; playerState = 5 }
+      seekTo(value) { time = value }
     } } },
   }
   try {
     for (const [key, value] of Object.entries(globals)) Object.defineProperty(globalThis, key, { configurable: true, value })
-    const music = setupMusic(() => ({ x: 474, y: 1370 }))
-    const pending = nodes.get('musicPlay').onclick()
-    if (action === 'disconnect') music.pause()
-    else {
-      expect(typeof nodes.get('musicClose')?.onclick).toBe('function')
-      nodes.get('musicClose').onclick()
-      expect(nodes.get('musicPanel').hidden).toBe(true)
-      expect(nodes.get('musicOpen').hidden).toBe(false)
-    }
+    const music = setupMusic({ getPosition: () => position, send: (message) => sent.push(message), isConnected: () => connected })
+    expect(nodes.get('musicPanel').hidden).toBe(true)
+    expect(nodes.get('musicOpen').hidden).toBe(true)
+    music.onMessage({ t: 'music-state', videoId: 'ffnnMC-yMR0', playing: true, position: 30, updatedAt: 1000, serverNow: 11000, revision: 1 })
+    expect(events).toBeUndefined()
+    position = { x: 474, y: 1370 }
+    music.update(true)
+    expect(nodes.get('musicPanel').hidden).toBe(false)
+    nodes.get('musicClose').onclick()
     events.onReady()
-    await pending
-    expect(playRequests).toBe(0)
+    await Promise.resolve()
+    expect(loads).toHaveLength(0)
+    expect(nodes.get('musicPanel').hidden).toBe(true)
+    expect(nodes.get('musicOpen').hidden).toBe(false)
+    nodes.get('musicOpen').onclick()
+    expect(loads.at(-1).startSeconds).toBeGreaterThanOrEqual(40)
+    expect(loads.at(-1).startSeconds).toBeLessThan(41)
+    expect(sent.some((m) => m.t === 'music-command')).toBe(false)
+    nodes.get('musicClose').onclick()
+    expect(playerState).toBe(2)
+    expect(sent.some((m) => m.action === 'pause')).toBe(false)
+    music.update(true)
+    expect(nodes.get('musicPanel').hidden).toBe(true)
+    position = { x: 120, y: 360 }
+    music.update(true)
+    expect(nodes.get('musicOpen').hidden).toBe(true)
+    position = { x: 474, y: 1370 }
+    music.update(true)
+    expect(nodes.get('musicPanel').hidden).toBe(false)
+    expect(playerState).toBe(1)
+    nodes.get('musicPause').onclick()
+    expect(sent.at(-1).action).toBe('pause')
+    music.onMessage({ t: 'music-state', videoId: 'ffnnMC-yMR0', playing: false, position: 55, updatedAt: 16000, serverNow: 16000, revision: 2 })
+    expect(playerState).toBe(2)
+    expect(time).toBe(55)
+    music.onMessage({ t: 'music-state', videoId: 'ffnnMC-yMR0', playing: true, position: 0, updatedAt: 1000, serverNow: 11000, revision: 1 })
+    expect(playerState).toBe(2)
+    music.onMessage({ t: 'music-state', videoId: 'Nv2GgV34qIg', playing: true, position: 110, updatedAt: 16000, serverNow: 16000, revision: 3 })
+    events.onStateChange({ data: 0 })
+    expect(sent.at(-1)).toMatchObject({ action: 'ended', revision: 3 })
+    connected = false
+    music.reset()
+    expect(nodes.get('musicPanel').hidden).toBe(true)
+    expect(nodes.get('musicOpen').hidden).toBe(true)
   } finally {
     for (const [key, descriptor] of Object.entries(original)) {
       if (descriptor) Object.defineProperty(globalThis, key, descriptor)

@@ -33,11 +33,14 @@ Other devices need HTTPS for camera, microphone and screen capture.
 - Chat messages go to the whole office. Reactions reach people in voice range or
   the same room and disappear after three seconds.
 - The reading room's existing turntable plays quiet jazz (Bill Evans, Peace Piece).
-  Use the music panel to play, pause or paste a YouTube video link; each listener
-  controls their own selection. Volume peaks at 50% within 80 world pixels, fades
-  to silence at 320 pixels and stays silent outside the reading room. YouTube
-  requires internet access and an embeddable video; press Play to enable playback.
-  Music pauses when the tab is hidden, the presentation is expanded or you leave.
+  Nearby listeners share the song, play/pause and server-timed playback position.
+  The music panel appears only in range; close it to stop listening locally or
+  reopen it to rejoin the current position. Closing, leaving or hiding your tab
+  does not pause the music for others. The Pause button pauses it for everyone.
+  Volume peaks at 50% within 80 world pixels, fades to silence at 320 pixels and
+  stays silent outside the reading room. YouTube requires an embeddable video;
+  some browsers require clicking Listen once. Drift is corrected periodically,
+  including after buffering. Shared music resets when the server restarts.
 - Near the turntable, press **B** or click **Dance** to dance in place; everyone
   sees your dance. Press B again, walk or sit to stop. E still controls sitting.
   Reduced-motion mode shows a static dance pose instead of animation.
