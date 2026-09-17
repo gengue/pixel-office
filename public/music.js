@@ -72,6 +72,14 @@ export function setupMusic({ getPosition, send, isConnected }) {
       else player.cueVideoById(video)
       return
     }
+    const video = player.getVideoData()
+    const duration = player.getDuration()
+    // Loading or seeking past the end can restart YouTube without an ended event.
+    if (video.video_id === shared.videoId && !video.isLive && duration > 0 && target >= duration) {
+      pauseLocal()
+      command('ended')
+      return
+    }
     if ([1, 2, 5].includes(state) && Math.abs(player.getCurrentTime() - target) > 0.75 && performance.now() - lastSeek > 1500) {
       lastSeek = performance.now()
       pendingState = shared.playing ? 1 : 2

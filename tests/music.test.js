@@ -26,7 +26,7 @@ test('record player has medium volume nearby, fades with distance and cannot rea
 test('music is hidden away from the turntable, joins the shared position and closes only for this listener', async () => {
   const original = Object.fromEntries(['document', 'window', 'location'].map((key) => [key, Object.getOwnPropertyDescriptor(globalThis, key)]))
   const nodes = new Map()
-  let events, playerState = -1, time = 0, connected = true
+  let events, playerState = -1, time = 0, connected = true, live = false
   let position = { x: 120, y: 360 }
   const loads = [], sent = []
   const globals = {
@@ -47,7 +47,7 @@ test('music is hidden away from the turntable, joins the shared position and clo
       getPlayerState() { return playerState }
       getCurrentTime() { return time }
       getDuration() { return 100 }
-      getVideoData() { return { video_id: loads.at(-1)?.videoId } }
+      getVideoData() { return { video_id: loads.at(-1)?.videoId, isLive: live } }
       pauseVideo() { playerState = 2; events.onStateChange({ data: 2 }) }
       playVideo() { playerState = 1; events.onStateChange({ data: 1 }) }
       loadVideoById(video) { loads.push(video); time = video.startSeconds; playerState = 1 }
@@ -95,8 +95,18 @@ test('music is hidden away from the turntable, joins the shared position and clo
     music.onMessage({ t: 'music-state', videoId: 'ffnnMC-yMR0', playing: true, position: 0, updatedAt: 1000, serverNow: 11000, revision: 1 })
     expect(playerState).toBe(2)
     music.onMessage({ t: 'music-state', videoId: 'Nv2GgV34qIg', playing: true, position: 110, updatedAt: 16000, serverNow: 16000, revision: 3 })
-    events.onStateChange({ data: 0 })
+    // YouTube restarts at zero when a returning listener loads beyond the end.
+    time = 0
+    music.update(true)
     expect(sent.at(-1)).toMatchObject({ action: 'ended', revision: 3 })
+    expect(time).toBe(0)
+    expect(playerState).toBe(2)
+    music.onMessage({ t: 'music-state', videoId: 'Nv2GgV34qIg', playing: false, position: 110, updatedAt: 16000, serverNow: 16000, revision: 4 })
+    expect(sent.at(-1)).toMatchObject({ action: 'ended', revision: 4 })
+    live = true
+    sent.length = 0
+    music.onMessage({ t: 'music-state', videoId: 'Nv2GgV34qIg', playing: true, position: 110, updatedAt: 16000, serverNow: 16000, revision: 5 })
+    expect(sent.some((m) => m.action === 'ended')).toBe(false)
     connected = false
     music.reset()
     expect(nodes.get('musicPanel').hidden).toBe(true)
