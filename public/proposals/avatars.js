@@ -2,7 +2,6 @@ import { WORLD, walls, furn } from '../world.js'
 import { ROOMS } from '../rooms.js'
 import { createOfficeArt } from '../office-art.js'
 import { drawBody } from '../avatars.js'
-import { lateralLegPose } from './avatar-motion.js'
 
 const $ = id => document.getElementById(id)
 const scene = $('scene').getContext('2d')
@@ -69,56 +68,25 @@ function measureCells(image, columns, rows, target) {
       if (data[((sy + y) * image.width + sx + x) * 4 + 3] < 32) continue
       left = Math.min(left, x); top = Math.min(top, y); right = Math.max(right, x); bottom = Math.max(bottom, y)
     }
-    target.push([sx + left, sy + top, right - left + 1, bottom - top + 1])
+    const crop = [sx + left, sy + top, right - left + 1, bottom - top + 1]
+    // Anchor each side pose at its collar, not the changing stride width.
+    let neckLeft = right, neckRight = left
+    for (let y = top; y < top + crop[3] * .04; y++) for (let x = left; x <= right; x++) {
+      if (data[((sy + y) * image.width + sx + x) * 4 + 3] < 32) continue
+      neckLeft = Math.min(neckLeft, x); neckRight = Math.max(neckRight, x)
+    }
+    crop.neckX = (neckLeft + neckRight) / 2 - left
+    target.push(crop)
   }
   loaded = cells.length > 0 && sideCells.length > 0
   if (loaded) $('status').textContent = 'Listo para probar.'
 }
 atlas.onload = () => measureCells(atlas, 4, 4, cells)
-sideAtlas.onload = () => measureCells(sideAtlas, 2, 3, sideCells)
+sideAtlas.onload = () => measureCells(sideAtlas, 2, 2, sideCells)
 atlas.onerror = sideAtlas.onerror = reference.onerror = () => { $('status').textContent = 'No se pudieron cargar las imágenes. Recarga la página.' }
 atlas.src = './avatar-atlas.png'
-sideAtlas.src = './avatar-side-parts.png'
+sideAtlas.src = './avatar-side-walk.png'
 reference.src = './avatar-reference.png'
-
-function drawSide(ctx, facing) {
-  const amount = Math.min(1, state.velocity / 40)
-  // Match the front/back cycle distance so side steps keep pace with travel.
-  const stride = Math.sin(state.distance * Math.PI * 2 / 40) * amount
-  function part(index, x, y, height, angle = 0, mirror = false) {
-    const crop = sideCells[index], width = crop[2] * height / crop[3]
-    ctx.save(); ctx.translate(x, y); ctx.rotate(angle)
-    if (mirror) ctx.scale(-1, 1)
-    ctx.drawImage(sideAtlas, ...crop, -width * .45, -3, width, height)
-    ctx.restore()
-  }
-  ctx.save()
-  if (facing === 'left') ctx.scale(-1, 1)
-  function leg(offset, behind) {
-    const pose = lateralLegPose(state.distance, offset, amount)
-    const crop = sideCells[3]
-    const width = crop[2] * 35 / crop[3]
-    function segment(start, end, from, to) {
-      ctx.save(); ctx.translate(start.x, start.y)
-      ctx.rotate(Math.atan2(start.x - end.x, end.y - start.y))
-      ctx.drawImage(sideAtlas, crop[0], crop[1] + crop[3] * from, crop[2], crop[3] * (to - from), -width * .4, -1, width, Math.hypot(end.x - start.x, end.y - start.y) + 2)
-      ctx.restore()
-    }
-    ctx.save()
-    if (behind) ctx.filter = 'brightness(.8)'
-    segment(pose.hip, pose.knee, 0, .49)
-    segment(pose.knee, pose.ankle, .46, .8)
-    ctx.drawImage(sideAtlas, crop[0], crop[1] + crop[3] * .78, crop[2], crop[3] * .22, pose.foot.x - width * .4, pose.foot.y - 8, width, 8)
-    ctx.restore()
-  }
-  // Continuous joint motion keeps the torso, backpack and limb silhouettes stable.
-  part(2, 3, -59, 32, stride * .13)
-  leg(20, true)
-  leg(0, false)
-  part(0, -5, -64, 38)
-  part(1, -2, -59, 32, -stride * .13)
-  ctx.restore()
-}
 
 function avatar(ctx, x, footY, facing, frame) {
   const sitting = state.sitting
@@ -133,19 +101,17 @@ function avatar(ctx, x, footY, facing, frame) {
   if (original) {
     drawBody(ctx, 'hombre', -24, sitting ? -44 : -60, 4, state.distance / 10, sitting, { motion:moving ? 1 : 0, facing:facing === 'left' ? -1 : 1, appearance:{ color:'forest', accessory:'satchel' } })
     headY = sitting ? -58 : -74
-  } else if (!sitting && (facing === 'left' || facing === 'right')) {
-    drawSide(ctx, facing)
-    headY = -83
   } else {
     const row = facing === 'back' ? 2 : facing === 'front' ? 0 : 1
+    const sideWalk = moving && row === 1
     const index = sitting ? 13 : moving ? row * 4 + frame : facing === 'back' ? 15 : facing === 'front' ? 12 : 14
-    const crop = cells[index]
-    const scale = 68 / cells[12][3]
+    const crop = sideWalk ? sideCells[frame] : cells[index]
+    const scale = 68 / (sideWalk ? crop[3] : cells[12][3])
     const width = crop[2] * scale, height = crop[3] * scale
     ctx.save()
     // The front/back contacts share a leading leg; mirror the second half-cycle.
     if (!sitting && (facing === 'left' || moving && row !== 1 && frame >= 2)) ctx.scale(-1, 1)
-    ctx.drawImage(atlas, ...crop, -width / 2, -height, width, height)
+    ctx.drawImage(sideWalk ? sideAtlas : atlas, ...crop, sideWalk ? -crop.neckX * scale : -width / 2, -height, width, height)
     ctx.restore()
     headY = -height - 16
   }

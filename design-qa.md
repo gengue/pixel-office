@@ -2,7 +2,7 @@
 
 final result: passed
 
-Scope: isolated `/proposals/avatars.html` study, not a replacement for production avatars. One forest outfit, four cardinal views (left mirrors right), continuous lateral limb animation, four front/back walking frames, idle and seated poses. Eight-direction art and the other outfits remain outside this first approval preview.
+Scope: isolated `/proposals/avatars.html` study, not a replacement for production avatars. One forest outfit, four cardinal views (left mirrors right), four whole-body walking poses per direction with shared timing, idle and seated poses. Eight-direction art and the other outfits remain outside this first approval preview. The chronological corrections below record superseded attempts; the final whole-body correction is the current implementation.
 
 ## Evidence
 
@@ -66,5 +66,18 @@ The user found the continuous side animation too slow. Its full cycle covered 56
 User feedback identified dragging feet despite the increased cadence. Replaced lateral rigid-leg oscillation with alternating planted and airborne phases: the stance foot cancels world travel exactly, while the returning foot clears the floor by eight world pixels. Two connected leg segments bend at the knee; boot soles stay level. Front/back rendering is unchanged.
 
 `tests/avatar-motion.test.js` passes 802 assertions covering stationary world-space support, alternating legs, full foot clearance, continuous cycle boundaries, and fixed segment lengths. The browser check passes in both directions at both speeds, along with the existing camera/mobile/reduced-motion interactions. Pixel-change peaks are now 12.2% and 15.2% because knees and lifted feet cover more area; the browser threshold accommodates this larger motion while the geometric test checks continuity directly. Visual contact sheet `/tmp/avatar-side-lift.png` shows eight sequential poses together, including visible clearance and connected knees. Build and diff checks passed. Earlier rigid-leg scope limitation is superseded by this correction; the torso and arm assets remain unchanged.
+
+final result: passed
+
+
+## Reference-led whole-body replacement (current implementation)
+
+The user rejected the articulated walk as crouched and explicitly requested the style and pacing of the approved front/back views. Research is recorded in `docs/avatar-walk-references.md`. Primary visual references actually inspected: Saint11's Top Down Walk Cycle and Walk Cycle diagrams, and J. K. Riki's four-pose diagram. Code measurement confirmed the support knee remained flexed 32.5–52.9 degrees with fixed hip height; the prior checks could not detect this inappropriate posture.
+
+Removed the lateral joint solver, segmented-limb renderer, obsolete parts atlas and solver-specific tests. Generated complete upright side poses (`public/proposals/avatar-side-walk.png`) using the approved original character and the reference contact/passing structure. Both contact halves and both passing halves are present. The new sprites anchor at the collar and share a 68-pixel body height so changing stride width does not move the torso sideways. Front/back drawing and art remain unchanged.
+
+The shared `frame` now drives every direction. Browser verification compares actual rendered frame-change times against the front view: all four directions use exactly four poses, eight changes/second at normal speed and twelve at 150%. Camera, seated pose, comparison toggle, mobile overflow, reduced motion and browser-error checks also pass. The old continuous-motion pixel threshold is intentionally removed: it contradicted the user's explicit request for the approved pose-based rhythm and had not established visual naturalness.
+
+Visual evidence: `/tmp/avatar-matched-poses.png` places front, side and back cycles together (four poses per row, identical drawing scale). Inspected extended support legs, lifted passing feet, collar alignment, outfit palette and complete silhouettes, with no segmented knees. Native scene and enlarged detail were both checked. This is visual QA evidence, not a claim of subjective user approval; the moving preview remains available for review.
 
 final result: passed
