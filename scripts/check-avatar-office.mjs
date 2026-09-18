@@ -5,6 +5,14 @@ const browser = await chromium.launch({executablePath:'/usr/bin/chromium',args:[
 const errors=[]
 try {
  const ctx=await browser.newContext({permissions:['camera','microphone'],viewport:{width:1400,height:1000},recordVideo:{dir:'/tmp/human-office-video',size:{width:1400,height:1000}}})
+ await ctx.addInitScript(() => {
+   const draw = CanvasRenderingContext2D.prototype.drawImage
+   window.danceDraws = 0
+   CanvasRenderingContext2D.prototype.drawImage = function(source, ...args) {
+     if (this.canvas.id === 'map' && source.width === 1122 && source.height < 400) window.danceDraws++
+     return draw.call(this, source, ...args)
+   }
+ })
  const a=await ctx.newPage(),b=await ctx.newPage()
  for(const p of [a,b])p.on('pageerror',e=>errors.push(e.message))
  const base=process.env.OFFICE_URL || 'https://workbox.bengal-balance.ts.net:8444/'
@@ -39,6 +47,8 @@ try {
  await a.evaluate(()=>Object.assign(__po.me,{x:430,y:1450,tx:null,ty:null}))
  await a.locator('#danceBtn').waitFor({state:'visible'});await a.locator('#danceBtn').click()
  await b.waitForFunction(()=>[...__po.peers.values()].some(p=>p.name==='Human A'&&p.dancing))
+ await a.waitForFunction(()=>window.danceDraws>0)
+ await b.waitForFunction(()=>window.danceDraws>0)
  await a.waitForTimeout(300);await a.screenshot({path:'/tmp/human-office-dance.png'})
  await a.emulateMedia({reducedMotion:'reduce'});await a.waitForTimeout(100)
  assert(await a.evaluate(()=>__po.me.dancing))
@@ -73,6 +83,7 @@ try {
    await guest.evaluate(()=>Object.assign(__po.me,{x:430,y:1450,tx:null,ty:null}))
    await guest.locator('#danceBtn').waitFor({state:'visible'});await guest.locator('#danceBtn').click()
    await a.waitForFunction(k=>[...__po.peers.values()].some(p=>p.name===k&&p.dancing),kind)
+   await guest.waitForFunction(()=>window.danceDraws>0)
    await guest.waitForFunction(()=>__po.me.y-__po.cam.y<__po.VIEW.h-90)
    await guest.screenshot({path:`/tmp/avatar-office-${kind}-dance.png`})
    await guest.close()

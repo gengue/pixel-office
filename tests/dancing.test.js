@@ -1,7 +1,7 @@
 import { test, expect } from 'bun:test'
 import { drawBody } from '../public/avatars.js'
 
-test('dance raises and alternates limbs without changing the seated pose', () => {
+test('legacy fallback dance raises and alternates limbs without changing the seated pose', () => {
   const render = (dancing, time, sitting = false) => {
     const pixels = []
     drawBody({ fillRect: (...rect) => pixels.push(rect) }, 'hombre', 0, 0, 4, 0, sitting, { dancing, time })

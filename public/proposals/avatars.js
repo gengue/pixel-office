@@ -11,17 +11,20 @@ const office = createOfficeArt(WORLD, ROOMS, walls, furn)
 const reference = new Image()
 const video = document.createElement('video')
 video.autoplay = video.muted = video.playsInline = true
-const state = { walking: !matchMedia('(prefers-reduced-motion: reduce)').matches, sitting:false, direction:'auto', speed:1, distance:0, travel:0, velocity:0, stream:null }
+const state = { walking: !matchMedia('(prefers-reduced-motion: reduce)').matches, sitting:false, dancing:false, danceTime:0, direction:'auto', speed:1, distance:0, travel:0, velocity:0, stream:null }
 
 function updateControls() {
   $('walk').setAttribute('aria-pressed', String(state.walking))
+  $('dance').setAttribute('aria-pressed', String(state.dancing))
+  $('dance').textContent = state.dancing ? 'Dejar de bailar' : 'Bailar'
   $('sit').setAttribute('aria-pressed', String(state.sitting))
   $('walk').textContent = state.walking ? 'Pausar' : 'Caminar'
   $('sit').textContent = state.sitting ? 'Levantarse' : 'Sentarse'
-  $('direction').disabled = state.sitting
+  $('direction').disabled = state.sitting || state.dancing
 }
-$('walk').onclick = () => { state.walking = !state.walking; state.sitting = false; updateControls() }
-$('sit').onclick = () => { state.sitting = !state.sitting; state.walking = false; state.velocity = 0; updateControls() }
+$('walk').onclick = () => { state.walking = !state.walking; state.sitting = state.dancing = false; updateControls() }
+$('sit').onclick = () => { state.sitting = !state.sitting; state.walking = state.dancing = false; state.velocity = 0; updateControls() }
+$('dance').onclick = () => { state.dancing = !state.dancing; state.walking = state.sitting = false; state.velocity = 0; state.danceTime = 0; updateControls() }
 $('direction').onchange = event => { state.direction = event.target.value }
 $('speed').oninput = event => { state.speed = Number(event.target.value) / 100; $('speed-value').textContent = `${state.speed}×` }
 updateControls()
@@ -71,11 +74,11 @@ function avatar(ctx, x, footY, facing) {
   if (sitting && office.ready) office.draw(ctx, { type:'chair', x:-25, y:-64, w:50, h:66 })
   let headY = sitting ? -65 : -90
   if (original) {
-    drawBody(ctx, $('character').value, -24, sitting ? -44 : -60, 4, state.distance / 10, sitting, { motion:moving ? 1 : 0, facing:facing === 'left' ? -1 : 1, classic:true, appearance:{ color:'forest', accessory:'satchel' } })
+    drawBody(ctx, $('character').value, -24, sitting ? -44 : -60, 4, state.distance / 10, sitting, { dancing:state.dancing, time:state.danceTime, motion:moving ? 1 : 0, facing:facing === 'left' ? -1 : 1, classic:true, appearance:{ color:'forest', accessory:'satchel' } })
     headY = sitting ? -58 : -74
   } else {
     const bodyY = sitting ? -48 : -68
-    const offset = drawBody(ctx, $('character').value, sitting ? -24 : -25.5, bodyY, sitting ? 4 : 4.25, state.distance / 8, sitting, { direction:facing, motion:moving ? 1 : 0 }) ?? 0
+    const offset = drawBody(ctx, $('character').value, sitting ? -24 : -25.5, bodyY, sitting ? 4 : 4.25, state.distance / 8, sitting, { direction:facing, motion:moving ? 1 : 0, dancing:state.dancing, time:state.danceTime }) ?? 0
     headY = bodyY + offset - 16
   }
   ctx.save()
@@ -97,6 +100,7 @@ function render(now) {
   const dt = Math.min((now - last) / 1000, .05); last = now
   state.velocity += ((state.walking ? 80 * state.speed : 0) - state.velocity) * (1 - Math.exp(-10 * dt))
   if (!state.walking && state.velocity < 1) state.velocity = 0
+  if (state.dancing && !matchMedia('(prefers-reduced-motion: reduce)').matches) state.danceTime += dt * state.speed
   state.distance += dt * state.velocity
   if (state.direction === 'auto') state.travel += dt * state.velocity
   const travel = state.travel % 960

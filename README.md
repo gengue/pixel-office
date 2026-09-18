@@ -159,6 +159,7 @@ The optional Playwright checks exercise the built office with synthetic cameras:
 ```sh
 node scripts/check-avatar-preview.mjs
 node scripts/check-avatar-office.mjs
+node scripts/check-avatar-dance.mjs
 ```
 
 Set `PLAYWRIGHT_MODULE` to an existing Playwright module if it is not installed

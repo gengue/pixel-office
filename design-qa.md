@@ -116,3 +116,10 @@ Independent review found tint-cache thrashing with nine color/atlas combinations
 Verification: 28 Bun tests passed with 7,373 assertions in an isolated source copy. The direct workspace suite still encounters the pre-existing malformed local admin credential; it was left untouched. Both Playwright scripts pass: six character selections, original/ocean colors and accessories, local/remote directions, sitting and dancing, synthetic live camera, mobile layout, reduced-motion mode, four distinct repeating poses, approved vertical timing and slower lateral timing. No browser page errors. Production build and diff checks passed.
 
 final result: passed
+
+
+## Dedicated dance animation correction
+
+The previous office check verified shared dance state but missed that the detailed renderer reused walking poses. Added a real-browser regression that failed on that behavior. All six characters now use four dedicated dance poses from one shared atlas; the humans share a row with their respective outfit colors. Collar anchors account for raised hands, while feet stay grounded. Sitting overrides dancing and reduced motion holds a static pose.
+
+The dance regression now checks decoded artwork, animation, distinctness from walking and seated precedence. Office checks also assert that the dance artwork is drawn locally and remotely. The prototype includes a dance control with normal and reduced-motion checks. Reviewed the 24-pose contact sheet and actual office screenshots and recordings. The focused browser check and full office check pass; 28 Bun tests pass with 7,373 assertions in an isolated source copy (the existing local admin credential is unchanged).
