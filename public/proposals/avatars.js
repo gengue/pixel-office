@@ -2,6 +2,7 @@ import { WORLD, walls, furn } from '../world.js'
 import { ROOMS } from '../rooms.js'
 import { createOfficeArt } from '../office-art.js'
 import { drawBody } from '../avatars.js'
+import { lateralLegPose } from './avatar-motion.js'
 
 const $ = id => document.getElementById(id)
 const scene = $('scene').getContext('2d')
@@ -93,10 +94,27 @@ function drawSide(ctx, facing) {
   }
   ctx.save()
   if (facing === 'left') ctx.scale(-1, 1)
+  function leg(offset, behind) {
+    const pose = lateralLegPose(state.distance, offset, amount)
+    const crop = sideCells[3]
+    const width = crop[2] * 35 / crop[3]
+    function segment(start, end, from, to) {
+      ctx.save(); ctx.translate(start.x, start.y)
+      ctx.rotate(Math.atan2(start.x - end.x, end.y - start.y))
+      ctx.drawImage(sideAtlas, crop[0], crop[1] + crop[3] * from, crop[2], crop[3] * (to - from), -width * .4, -1, width, Math.hypot(end.x - start.x, end.y - start.y) + 2)
+      ctx.restore()
+    }
+    ctx.save()
+    if (behind) ctx.filter = 'brightness(.8)'
+    segment(pose.hip, pose.knee, 0, .49)
+    segment(pose.knee, pose.ankle, .46, .8)
+    ctx.drawImage(sideAtlas, crop[0], crop[1] + crop[3] * .78, crop[2], crop[3] * .22, pose.foot.x - width * .4, pose.foot.y - 8, width, 8)
+    ctx.restore()
+  }
   // Continuous joint motion keeps the torso, backpack and limb silhouettes stable.
   part(2, 3, -59, 32, stride * .13)
-  part(4, 1, -32, 35, stride * .24, true)
-  part(3, 1, -32, 35, -stride * .24)
+  leg(20, true)
+  leg(0, false)
   part(0, -5, -64, 38)
   part(1, -2, -59, 32, -stride * .13)
   ctx.restore()

@@ -88,7 +88,8 @@ try {
     }, speed)
     assert(result.cycleDifference < .005, `${direction}: lateral cadence must complete a cycle every 40 world pixels (${result.cycleDifference})`)
     // The previous lateral atlas jumped across 47.5% of this region in one frame.
-    assert(result.peak < .08 * speed / 100, `${direction} at ${speed}%: abrupt limb jump (${result.peak})`)
+    // Knee bending and an eight-pixel foot lift cover more area than the former shuffle.
+    assert(result.peak < .14 * speed / 100, `${direction} at ${speed}%: abrupt limb jump (${result.peak})`)
     assert(result.movingFrames >= 55, `${direction}: motion must progress between poses`)
     console.log(`Lateral ${direction} ${speed}%: peak pixel change ${(result.peak * 100).toFixed(1)}%, ${result.movingFrames}/60 moving frames`)
   }

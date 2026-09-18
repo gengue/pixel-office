@@ -61,4 +61,10 @@ No remaining actionable P0/P1/P2 findings within this study's scope.
 
 The user found the continuous side animation too slow. Its full cycle covered 56 world pixels versus 40 for front/back. Matched the lateral cycle to 40 pixels (40% higher cadence) without increasing limb swing or changing travel speed. Added a deterministic browser assertion for a complete cycle every 40 pixels; it failed before the fix and passed afterward in both directions at normal and 150% speed. The existing smoothness check still passes: maximum adjacent-frame changes 7.5% and 9.7%, respectively, with motion in 60/60 frames. Build and all 26 tests passed in the isolated source checkout.
 
+### Foot planting and clearance correction
+
+User feedback identified dragging feet despite the increased cadence. Replaced lateral rigid-leg oscillation with alternating planted and airborne phases: the stance foot cancels world travel exactly, while the returning foot clears the floor by eight world pixels. Two connected leg segments bend at the knee; boot soles stay level. Front/back rendering is unchanged.
+
+`tests/avatar-motion.test.js` passes 802 assertions covering stationary world-space support, alternating legs, full foot clearance, continuous cycle boundaries, and fixed segment lengths. The browser check passes in both directions at both speeds, along with the existing camera/mobile/reduced-motion interactions. Pixel-change peaks are now 12.2% and 15.2% because knees and lifted feet cover more area; the browser threshold accommodates this larger motion while the geometric test checks continuity directly. Visual contact sheet `/tmp/avatar-side-lift.png` shows eight sequential poses together, including visible clearance and connected knees. Build and diff checks passed. Earlier rigid-leg scope limitation is superseded by this correction; the torso and arm assets remain unchanged.
+
 final result: passed
