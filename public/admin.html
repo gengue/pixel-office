@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>Admin · Pixel Office</title>
+  <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg" />
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <main id="lobby">
+    <section class="card" aria-labelledby="adminTitle">
+      <p class="eyebrow">PIXEL OFFICE</p>
+      <h1 id="adminTitle">Admin access</h1>
+      <p class="sub">Your admin identity stays with this browser, whatever name or avatar you choose.</p>
+      <form id="adminLogin" hidden>
+        <label class="field" for="adminPassword">Private password
+          <input id="adminPassword" type="password" autocomplete="current-password" maxlength="256" required />
+        </label>
+        <button id="adminSubmit" type="submit">Remember this browser</button>
+        <p class="hint">Remembered for 90 days. Only sign in on a device you trust.</p>
+      </form>
+      <div id="adminSession" hidden>
+        <p class="pill on">You are the admin</p>
+        <p class="hint">This browser is recognized. Your name does not affect your permissions.</p>
+        <p class="hint">Return to the office to use your access. Reload any other office tabs after signing in.</p>
+        <h2>Publish an update</h2>
+        <p class="hint">After publishing a new version, reload connected users. They return to their positions with their names, characters, microphone and camera settings.</p>
+        <button id="reloadEveryone" type="button">Reload everyone</button>
+        <p id="reloadStatus" class="hint" role="status" aria-live="polite"></p>
+        <button id="adminLogout" type="button" class="ghost">Forget this browser</button>
+      </div>
+      <p id="adminStatus" role="status" aria-live="polite">Checking access…</p>
+      <p><a href="/">Return to the office →</a></p>
+    </section>
+  </main>
+  <script type="module">
+    const $ = (id) => document.getElementById(id)
+    async function session(method = 'GET', password) {
+      $('adminSubmit').disabled = $('adminLogout').disabled = true
+      $('adminStatus').textContent = method === 'GET' ? 'Checking access…' : 'Please wait…'
+      try {
+        const response = await fetch('/admin/session', {
+          method, headers: { 'Content-Type': 'application/json' }, cache: 'no-store',
+          ...(password === undefined ? {} : { body: JSON.stringify({ password }) }),
+        })
+        const result = await response.json()
+        if (!response.ok) throw new Error(result.error || 'Could not update admin access.')
+        $('adminLogin').hidden = result.admin
+        $('adminSession').hidden = !result.admin
+        $('adminStatus').textContent = result.admin ? 'Admin access is active.' : method === 'DELETE' ? 'This browser is no longer an admin.' : ''
+        $('adminPassword').value = ''
+        if (!result.admin) $('adminPassword').focus()
+      } catch (error) {
+        $('adminStatus').textContent = error.message || 'Could not reach the server. Please try again.'
+      } finally {
+        $('adminSubmit').disabled = $('adminLogout').disabled = false
+      }
+    }
+    $('adminLogin').onsubmit = (event) => { event.preventDefault(); void session('POST', $('adminPassword').value) }
+    $('adminLogout').onclick = () => void session('DELETE')
+    $('reloadEveryone').onclick = async () => {
+      $('reloadEveryone').disabled = true
+      $('reloadStatus').textContent = 'Requesting reload…'
+      try {
+        const response = await fetch('/admin/reload', { method: 'POST' })
+        const result = await response.json()
+        if (!response.ok) throw new Error(result.error || 'Could not request a reload.')
+        $('reloadStatus').textContent = `Reload requested for ${result.notified} connected users.`
+      } catch (error) {
+        $('reloadStatus').textContent = error.message || 'Could not reach the server.'
+      } finally { $('reloadEveryone').disabled = false }
+    }
+    void session()
+  </script>
+</body>
+</html>

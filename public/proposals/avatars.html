@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="es">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pixel con volumen · Prueba de movimiento</title>
+<style>
+  * { box-sizing: border-box } body { margin:0; background:#faf8ef; color:#193d33; font:16px/1.5 system-ui,sans-serif }
+  main { max-width:1280px; margin:auto; padding:32px } header { display:flex; justify-content:space-between; align-items:center; gap:20px; margin-bottom:24px }
+  h1 { font:700 clamp(30px,4vw,48px)/1.1 Georgia,serif; margin:8px 0 } p { margin:8px 0; color:#586d61 } a { color:inherit } .eyebrow { font-size:12px; letter-spacing:.12em; text-transform:uppercase }
+  .layout { display:grid; grid-template-columns:minmax(0,1fr) 300px; gap:20px } .panel { border:1px solid #b5c4b4; border-radius:14px; overflow:hidden; background:#fffdf5 }
+  .panel h2 { font:700 22px Georgia,serif; margin:20px 20px 4px } .panel p { margin:4px 20px 16px; font-size:14px }
+  canvas { display:block; width:100%; image-rendering:pixelated } #scene { aspect-ratio: 880 / 520 } #detail { height:auto; aspect-ratio:600 / 560 }
+  .controls { padding:20px; display:flex; align-items:center; flex-wrap:wrap; gap:12px; border-top:1px solid #d9dfce } button,select { font:inherit; border:1px solid #9aae9b; border-radius:8px; padding:9px 13px; color:#234c3a; background:#fffdf5; cursor:pointer }
+  button[aria-pressed="true"] { color:#fff; background:#315a42; border-color:#315a42 } button:focus-visible, select:focus-visible, input:focus-visible,a:focus-visible { outline:3px solid #b97826; outline-offset:3px }
+  label { display:flex; gap:8px; align-items:center; font-size:14px } input[type=range] { width:115px; accent-color:#315a42 } footer { margin-top:20px; display:flex; flex-wrap:wrap; justify-content:space-between; gap:12px; font-size:14px }
+  #status { min-height:1.5em } #camera { width:100% } .aside-controls { padding:0 20px 20px } .hint { font-size:13px; color:#647567 }
+  @media(max-width:800px) { main { padding:18px } header { align-items:flex-start } header>a { font-size:13px } .layout { grid-template-columns:1fr } .controls { padding:14px } }
+</style>
+<main>
+  <header><div><div class="eyebrow">Pixel Office · Estudio de personajes / 03</div><h1>Pixel con volumen</h1><p>Más detalle. Pasos con peso. Tu cámara, como siempre.</p></div><a href="/">Volver a la oficina</a></header>
+  <div class="layout">
+    <section class="panel" aria-label="Prueba en el escenario"><canvas id="scene" width="880" height="520" aria-label="Personaje animado en la oficina"></canvas>
+      <div class="controls">
+        <button id="walk" aria-pressed="true">Caminar</button><button id="sit" aria-pressed="false">Sentarse</button>
+        <label>Vista <select id="direction"><option value="auto">Recorrido automático</option><option value="front">Frente</option><option value="right">Derecha</option><option value="back">Espalda</option><option value="left">Izquierda</option></select></label>
+        <label>Ritmo <input id="speed" type="range" min="50" max="150" value="100"><output id="speed-value">1×</output></label>
+      </div>
+    </section>
+    <section class="panel"><h2>Detalle ampliado</h2><p>La misma animación, de cerca.</p><canvas id="detail" width="600" height="560" aria-label="Detalle ampliado del personaje"></canvas>
+      <div class="aside-controls"><label><input id="original" type="checkbox">Comparar con el cuerpo actual</label><p id="status" role="status">Cargando personajes…</p><button id="camera">Probar con mi cámara</button></div>
+    </section>
+  </div>
+  <footer><span>Prueba visual · 4 vistas, caminata y pose sentada.</span><a href="./avatar-reference.png" target="_blank" rel="noopener">Ver propuesta elegida</a></footer>
+  <p class="hint">La foto es una muestra. La cámara se activa solo al pulsar el botón y se queda en esta página.</p>
+</main>
+<script type="module" src="./avatars.js"></script>
+</html>

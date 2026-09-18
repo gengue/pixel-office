@@ -41,6 +41,7 @@
   <header>
     <strong>Pixel Office</strong>
     <span id="meLabel"></span>
+    <a id="adminBadge" class="pill" href="/admin" target="_blank" rel="noopener" hidden>Admin</a>
     <span id="callLabel" class="pill">not in call</span>
     <span class="spacer"></span>
     <span id="count"></span>
@@ -55,6 +56,7 @@
       <div id="nearbyActions" role="group" aria-label="Nearby actions">
         <button id="sitBtn" type="button" hidden>E · Sit down</button>
         <button id="danceBtn" type="button" aria-pressed="false" hidden>B · Dance</button>
+        <button id="boardOpen" type="button" aria-haspopup="dialog" aria-controls="whiteboardDialog" hidden>✎ Open whiteboard</button>
       </div>
     </div>
     <aside>
@@ -120,6 +122,22 @@
     <div id="reactionPicker" popover aria-label="Choose a reaction"><div id="reactionChoices" role="group" aria-label="Reactions"></div></div>
   </footer>
 </div>
+
+<dialog id="whiteboardDialog" aria-labelledby="whiteboardTitle" aria-describedby="whiteboardHelp">
+  <div class="meetingHeading">
+    <div><p class="eyebrow">MEETING ROOM</p><h2 id="whiteboardTitle">Shared whiteboard</h2></div>
+    <button id="boardClose" type="button" class="ghost" aria-label="Close whiteboard">×</button>
+  </div>
+  <p id="whiteboardHelp" class="hint">Draw together. Choose Text, type a note, then click the board to place it. Changes save automatically.</p>
+  <div class="boardToolbar">
+    <label>Tool <select id="boardTool"><option value="pen">Pencil</option><option value="eraser">Eraser</option><option value="text">Text</option></select></label>
+    <label>Color <input id="boardColor" type="color" value="#4338ca" /></label>
+    <label>Line width <select id="boardSize"><option value="3">Fine</option><option value="6" selected>Medium</option><option value="12">Bold</option></select></label>
+    <label id="boardTextLabel" hidden>Text <input id="boardText" maxlength="200" placeholder="Write a note…" /></label>
+  </div>
+  <canvas id="whiteboardCanvas" aria-label="Shared drawing canvas. Use the pointer to draw, erase, or place text."></canvas>
+  <p id="whiteboardStatus" class="hint" role="status" aria-live="polite"></p>
+</dialog>
 
 <dialog id="meetingDialog" aria-labelledby="meetingTitle">
   <div class="meetingHeading">

@@ -8,9 +8,14 @@ import { REACTIONS } from './public/reactions.js'
 import { ROOMS, roomAt, fullRoomAt } from './public/rooms.js'
 import { canViewScreen, canShareVoice, voiceVolume, LINK } from './public/voice.js'
 import { DEFAULT_VIDEO, musicPosition, musicVolume } from './public/music.js'
+import { nearBoard } from './public/whiteboard.js'
+import { openWhiteboard } from './whiteboard-store'
+import { openAdmin } from './admin'
 
 const PORT = Number(process.env.PORT ?? 3000)
 const PUB = join(import.meta.dir, 'public')
+const whiteboard = openWhiteboard(process.env.WHITEBOARD_DB ?? join(process.cwd(), 'data', 'whiteboard.sqlite'))
+const admin = openAdmin(join(process.cwd(), 'data', 'admin'))
 
 const MIME: Record<string, string> = {
   '.html': 'text/html; charset=utf-8',
@@ -25,12 +30,12 @@ const MIME: Record<string, string> = {
 function serveFile(path: string) {
   const ext = extname(path)
   return new Response(readFileSync(path), {
-    headers: { 'Content-Type': MIME[ext] ?? 'application/octet-stream' },
+    headers: { 'Content-Type': MIME[ext] ?? 'application/octet-stream', ...(['.html', '.js', '.css'].includes(ext) ? { 'Cache-Control': 'no-store' } : {}) },
   })
 }
 
 type Player = { id: string; name: string; body: string; appearance?: ReturnType<typeof normalizeAppearance>; country: string; hand: boolean; muted: boolean; sitting: boolean; dancing: boolean; x: number; y: number }
-type SockData = { id: string; player: Player; tab?: string; shareState?: string; lastReaction?: number }
+type SockData = { id: string; player: Player; tab?: string; shareState?: string; lastReaction?: number; boardOpen?: boolean; adminToken: string }
 type ScreenShare = { id: string; owner: string; room: number }
 
 const sockets = new Set<any>()
@@ -39,6 +44,7 @@ const tabs = new Map<string, any>() // tabId -> ws (one tab = one player)
 const shares = new Map<string, ScreenShare>()
 const music = { videoId: DEFAULT_VIDEO, playing: false, position: 0, updatedAt: Date.now(), revision: 0 }
 let seq = 0
+let lastReload = 0
 
 function musicSnapshot(requestAt?: number) {
   return { t: 'music-state', ...music, serverNow: Date.now(), requestAt }
@@ -107,8 +113,36 @@ function updateShares() {
 const server = Bun.serve<SockData>({
   port: PORT,
   hostname: process.env.HOST ?? '0.0.0.0',
+  maxRequestBodySize: 4096,
   async fetch(req, srv) {
     const url = new URL(req.url)
+    if (url.pathname === '/admin/reload') {
+      const reply = (body: object, status = 200) => Response.json(body, { status, headers: { 'Cache-Control': 'no-store' } })
+      if (req.method !== 'POST') return reply({ error: 'Method not allowed.' }, 405)
+      if (!admin.sameOrigin(req) || !admin.isAdmin(admin.token(req))) return reply({ error: 'Admin access required.' }, 403)
+      if (Date.now() - lastReload < 5000) return reply({ error: 'A reload was just requested. Wait a few seconds.' }, 429)
+      lastReload = Date.now()
+      let notified = 0
+      for (const ws of sockets) {
+        if (!ws.data.player.name) continue
+        try { ws.send(JSON.stringify({ t: 'office-reload' })); notified++ } catch {}
+      }
+      return reply({ notified })
+    }
+    if (url.pathname === '/admin/session') {
+      try {
+        return await admin.handle(req, (token) => {
+          for (const ws of sockets) {
+            if (token && ws.data.adminToken === token) {
+              ws.data.adminToken = ''
+              ws.send(JSON.stringify({ t: 'admin-state', admin: false }))
+            }
+          }
+        })
+      } catch {
+        return Response.json({ error: 'Admin access is temporarily unavailable.' }, { status: 503, headers: { 'Cache-Control': 'no-store' } })
+      }
+    }
     if (url.pathname === '/rtc-config') {
       try {
         return Response.json(await getRTCConfig(), { headers: { 'Cache-Control': 'no-store' } })
@@ -118,12 +152,13 @@ const server = Bun.serve<SockData>({
       }
     }
     if (url.pathname === '/ws') {
+      if (req.headers.has('origin') && !admin.sameOrigin(req)) return new Response('Forbidden', { status: 403 })
       const id = `u${Date.now().toString(36)}${(seq++).toString(36)}${Math.floor(Math.random() * 1e4).toString(36)}`
-      const upgraded = srv.upgrade(req, { data: { id, player: { id, name: '', body: 'hombre', ...spawnPoint() } } })
+      const upgraded = srv.upgrade(req, { data: { id, adminToken: admin.token(req), player: { id, name: '', body: 'hombre', ...spawnPoint() } } })
       if (upgraded) return undefined
       return new Response('upgrade failed', { status: 500 })
     }
-    let p = url.pathname === '/' ? '/index.html' : url.pathname
+    let p = url.pathname === '/' ? '/index.html' : ['/admin', '/admin/'].includes(url.pathname) ? '/admin.html' : url.pathname
     const file = join(PUB, decodeURIComponent(p).replace(/\.\./g, ''))
     if (existsSync(file) && statSync(file).isFile()) return serveFile(file)
     return new Response('not found', { status: 404 })
@@ -142,6 +177,34 @@ const server = Bun.serve<SockData>({
       }
       if (!msg || typeof msg !== 'object' || Array.isArray(msg)) return
       const me = ws.data.player
+      if (msg.t === 'admin-status') {
+        ws.send(JSON.stringify({ t: 'admin-state', admin: admin.isAdmin(ws.data.adminToken) }))
+        return
+      }
+      if (msg.t === 'board-close') { ws.data.boardOpen = false; return }
+      if (msg.t === 'board-open' || msg.t === 'board-operation') {
+        if (!me.name || !nearBoard(me)) {
+          ws.send(JSON.stringify({ t: 'board-error', id: msg.op?.id, message: 'Walk closer to the meeting room whiteboard.' }))
+          return
+        }
+        try {
+          if (msg.t === 'board-open') {
+            ws.send(JSON.stringify({ t: 'board-state', operations: whiteboard.snapshot() }))
+            ws.data.boardOpen = true
+          } else {
+            if (!ws.data.boardOpen) throw new Error('Open the whiteboard before editing.')
+            const op = whiteboard.append(msg.op)
+            if (op) {
+              const message = JSON.stringify({ t: 'board-operation', op })
+              for (const peer of sockets) if (peer.data.boardOpen) peer.send(message)
+            }
+          }
+        } catch (error) {
+          console.error('Whiteboard operation failed:', error)
+          ws.send(JSON.stringify({ t: 'board-error', id: msg.op?.id, message: 'Could not save this change. The board may be full or storage unavailable; please try again.' }))
+        }
+        return
+      }
       if (msg.t === 'join') {
         const tab = String(msg.tab ?? '')
         if (tab) {
@@ -149,7 +212,7 @@ const server = Bun.serve<SockData>({
           if (old && old !== ws) {
             tabs.delete(tab)
             try {
-              old.close()
+              old.close(4001, 'This office tab was replaced.')
             } catch {}
           }
           tabs.set(tab, ws)
@@ -160,14 +223,14 @@ const server = Bun.serve<SockData>({
         me.appearance = normalizeAppearance(msg.appearance)
         const cc = String(msg.country ?? '').toUpperCase().slice(0, 2)
         me.country = /^[A-Z]{2}$/.test(cc) ? cc : ''
-        me.hand = false
-        me.muted = false
+        me.hand = msg.hand === true
+        me.muted = msg.muted === true
         me.sitting = false
         me.dancing = false
         const arrival = resolveArrival(msg.destination, roster().filter((p) => p.name), me.id)
         if (arrival?.point) movePlayer(ws, arrival.point.x, arrival.point.y)
-        else if (!arrival) movePlayer(ws, msg.x, msg.y)
-        ws.send(JSON.stringify({ t: 'welcome', id: ws.data.id, roster: roster(), notice: arrival?.notice, teleported: !!arrival?.point }))
+        else if (!arrival && movePlayer(ws, msg.x, msg.y)) me.sitting = msg.sitting === true
+        ws.send(JSON.stringify({ t: 'welcome', id: ws.data.id, admin: admin.isAdmin(ws.data.adminToken), roster: roster(), notice: arrival?.notice, teleported: !!arrival?.point }))
         ws.send(JSON.stringify(musicSnapshot()))
         broadcast({ t: 'peer-join', player: me, teleported: !!arrival?.point }, ws.data.id)
         updateShares()

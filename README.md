@@ -32,6 +32,10 @@ Other devices need HTTPS for camera, microphone and screen capture.
   Camera and microphone stay connected. Leaving the room ends your presentation.
 - Chat messages go to the whole office. Reactions reach people in voice range or
   the same room and disappear after three seconds.
+- Walk up to the meeting room's wall whiteboard and select **Open whiteboard**.
+  Draw, erase or place text in any color. Nearby participants see saved changes
+  as each stroke or note is submitted; closing the board or restarting the server
+  keeps its contents.
 - The reading room's existing turntable plays quiet jazz (Bill Evans, Peace Piece).
   Nearby listeners share the song, play/pause and server-timed playback position.
   The music panel appears only in range; close it to stop listening locally or
@@ -47,6 +51,51 @@ Other devices need HTTPS for camera, microphone and screen capture.
 
 Each room allows one presenter. Outside rooms, screen sharing reaches nearby people
 who are also outside rooms. Screen capture targets 720p at 15 fps without system audio.
+
+## Admin access
+
+Open `/admin` and enter the password from `data/admin/password.txt` on the server.
+The server generates this private file automatically on first start; no environment
+variables are required. It is outside the public directory and excluded from Git.
+The file and its directory are readable only by the operating-system user running
+the server. Do not put the password in frontend code or a shared invitation link.
+
+The browser remembers your admin session for 90 days with an HttpOnly cookie.
+Changing your display name or avatar does not change your admin identity. A private
+**Admin** link appears beside your name in the office. Other browsers remain guests;
+sign in separately on each trusted device. Browser fingerprints are not used.
+**Forget this browser** in `/admin` revokes that session, including open office tabs.
+After signing in, return to the office or reload any previously open office tabs.
+
+Preserve `data/admin/` across releases to keep the password and sessions. To rotate
+the password and invalidate every session, remove only `data/admin/password.txt`
+and restart; the server generates a new password. Production requires HTTPS.
+Future privileged HTTP routes must check `admin.isAdmin(admin.token(req))`, and
+WebSocket actions must check `admin.isAdmin(ws.data.adminToken)` on each action;
+hiding a control in the browser is not authorization.
+
+### Reload connected users after an update
+
+Build and restart the server, then select **Reload everyone** in `/admin`.
+The Admin link opens in another tab so your office session stays connected too.
+Connected office tabs retry their connection during a server restart; the button
+requests a reload from everyone currently joined. Each tab saves its own name,
+appearance, position, seat and raised hand, then rejoins automatically. A previous
+meeting-link destination does not override the saved position. Room capacity
+rules still apply if the destination has filled up during the reload.
+
+Microphone and camera choices are saved in browser storage whenever you toggle
+them and applied before media is attached to any call, including after a normal
+manual entry. Resume checkpoints expire after 15 minutes and are cleared after
+rejoining; clicking **Leave** still returns to the lobby. Temporary connection
+failures retry automatically; browser permission failures show the normal retry
+message. Screen sharing must be started again because browsers require a new
+selection. Browser storage must be available to save a reload checkpoint.
+
+HTML, scripts and styles are served without caching to pick up the published
+build. This command takes effect for clients already running this feature; older
+clients need one manual reload to install it. Publishing does not itself trigger
+a global reload.
 
 ## Meeting links
 
@@ -90,6 +139,13 @@ HOST=127.0.0.1 PORT=3000 bun run start:prod
 Serve it behind an HTTPS reverse proxy with WebSocket support. The build bundles
 browser code, CSS, the server and public assets into `dist/`.
 
+The shared whiteboard uses Bun's built-in SQLite in `data/whiteboard.sqlite`,
+relative to the server's working directory. Set `WHITEBOARD_DB` to an absolute
+path on persistent storage when deploying; preserve that directory across releases.
+The board currently accepts 10,000 operations (up to 512 points per stroke and
+200 characters per note). At capacity it rejects new changes without deleting
+existing content. All office visitors near the board can edit it.
+
 ## Checks
 
 ```sh
@@ -116,7 +172,8 @@ suppress decorative animation.
 
 ## Limits
 
-This is an experiment: one shared office, no accounts, access control or persistence.
+This is an experiment: one shared office with a single owner password and no guest
+accounts. The whiteboard and admin sessions persist; other shared state lives in memory.
 Anyone with the deployment URL can join; chat and positions are public to that office.
 The TURN configuration endpoint is also public, so operate it with provider quotas.
 

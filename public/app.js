@@ -11,6 +11,11 @@ import { ROOMS as floors, fullRoomAt } from './rooms.js'
 import { REACTIONS } from './reactions.js'
 import { setupScreenShare } from './screen-share.js'
 import { setupMusic, musicVolume } from './music.js'
+import { setupWhiteboard } from './whiteboard.js'
+import { mediaPreferences, saveMediaPreferences, saveReloadSession, reloadSession, clearReloadSession } from './session.js'
+
+let pendingResume = reloadSession(sessionStorage)
+const savedMedia = pendingResume ?? mediaPreferences(localStorage)
 
 const VIEW = { w: 960, h: 600 }
 const cam = { x: 0, y: 0 }
@@ -115,6 +120,8 @@ let localStream = null
 // ---------- state ----------
 let ws = null
 let myId = null
+let hasEntered = false, leaving = false, reloading = false
+let reconnectTimer, joinTimer, reconnectDelay = 1000
 const tabId =
   sessionStorage.getItem('po-tab') ?? crypto.randomUUID?.() ?? String(Math.random())
 sessionStorage.setItem('po-tab', tabId)
@@ -124,7 +131,11 @@ const peers = new Map() // id -> {id,name,body,x,y,walk,moving,videoEl}
 window.__po = { me, cam, peers, WORLD, VIEW }
 const pcs = new Map() // id -> RTCPeerConnection
 const keys = new Set()
-let muted = false
+const whiteboard = setupWhiteboard({
+  getPosition: () => me, send: (message) => send(message), isConnected: () => !!myId && ws?.readyState === 1,
+  stopMoving() { keys.clear(); cancelVisit(); me.tx = me.ty = null; stopDancing() },
+})
+let muted = savedMedia.muted, cameraOff = savedMedia.cameraOff
 const bubbles = new Map() // bubbleId -> {el, pid, until}
 
 const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y)
@@ -221,6 +232,14 @@ function failJoin(msg) {
   $('lobbyErr').textContent = msg
 }
 
+function retryResume() {
+  if (!pendingResume || leaving || reloading) return
+  clearTimeout(reconnectTimer)
+  setStatus('Rejoining automatically when the server is ready…', true)
+  reconnectTimer = setTimeout(joinOffice, reconnectDelay)
+  reconnectDelay = Math.min(5000, reconnectDelay * 2)
+}
+
 function enterStage() {
   if (!$('stage').hidden) return
   setStatus('')
@@ -234,39 +253,86 @@ function enterStage() {
 }
 
 function connect() {
+  clearTimeout(reconnectTimer)
   // drop previous connection: one tab = one player (avoids ghost twin)
   try {
-    ws?.close()
+    if (ws) { ws.onclose = null; ws.close() }
   } catch {}
-  ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`)
+  const socket = ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`)
   ws.onopen = () => {
+    if (socket !== ws) return
     setStatus('joining…', true)
-    send({ t: 'join', tab: tabId, name: me.name, body: me.body, appearance: me.appearance, country: me.country, x: me.x, y: me.y, destination: location.search })
+    send({ t: 'join', tab: tabId, name: me.name, body: me.body, appearance: me.appearance, country: me.country, x: me.x, y: me.y, muted, hand: me.hand, sitting: me.sitting, destination: hasEntered || pendingResume ? '' : location.search })
   }
-  ws.onerror = () => failJoin('Could not reach the server. Check your connection and try again.')
-  ws.onclose = () => {
+  ws.onerror = () => { if (socket === ws && !hasEntered) failJoin('Could not reach the server. Check your connection and try again.') }
+  ws.onclose = (event) => {
+    if (socket !== ws) return
+    clearTimeout(joinTimer)
+    myId = null
+    $('adminBadge').hidden = true
     cancelVisit()
+    keys.clear()
+    me.tx = me.ty = null
     arrivals.clear()
     screenShare.reset()
     music.reset()
+    whiteboard.reset()
     stopDancing()
-    if (!$('stage').hidden && !myId) failJoin('Connection lost before entering. Try again.')
+    for (const id of pcs.keys()) closePC(id)
+    peers.clear()
+    for (const bubble of bubbles.values()) bubble.el.remove()
+    bubbles.clear()
+    if (leaving || reloading) return
+    if (!hasEntered) {
+      failJoin('Connection lost before entering. Try again.')
+      if (event.code !== 4001) retryResume()
+      return
+    }
+    clearTimeout(roomNoticeTimer)
+    $('roomStatus').textContent = event.code === 4001 ? 'This office tab was replaced. Reload to rejoin.' : 'Reconnecting to the office…'
+    if (event.code !== 4001) {
+      reconnectTimer = setTimeout(connect, reconnectDelay)
+      reconnectDelay = Math.min(5000, reconnectDelay * 2)
+    }
   }
   ws.onmessage = (ev) => {
+    if (socket !== ws) return
     const m = JSON.parse(ev.data)
     if (m.t === 'welcome') {
+      clearTimeout(joinTimer)
+      if (hasEntered) showRoomNotice('Reconnected to the office')
+      hasEntered = true
+      reconnectDelay = 1000
+      pendingResume = null
+      clearReloadSession(sessionStorage)
+      $('adminBadge').hidden = m.admin !== true
       myId = m.id
       me.id = myId
       setStatus('')
       for (const p of m.roster) {
         if (p.id !== myId) upsertPeer(p)
-        else Object.assign(me, { x: p.x, y: p.y, tx: null, ty: null })
+        else Object.assign(me, { x: p.x, y: p.y, sitting: p.sitting, hand: p.hand, muted: p.muted, tx: null, ty: null })
       }
+      if (!me.sitting) seatReturn = null
+      updateMediaControls()
+      updateHandControl()
       cam.x = Math.max(0, Math.min(WORLD.w - VIEW.w, me.x - VIEW.w / 2))
       cam.y = Math.max(0, Math.min(WORLD.h - VIEW.h, me.y - VIEW.h / 2))
       enterStage()
       if (m.teleported) markArrival(me)
       if (m.notice) showRoomNotice(m.notice)
+    } else if (m.t === 'office-reload') {
+      if (!hasEntered || reloading) return
+      if (!saveReloadSession(sessionStorage, me, { muted, cameraOff }, seatReturn)) {
+        showRoomNotice('Could not save your place: browser storage is unavailable. Please reload manually.')
+        return
+      }
+      reloading = true
+      location.reload()
+    } else if (m.t === 'admin-state') {
+      $('adminBadge').hidden = m.admin !== true
+    } else if (m.t.startsWith('board-')) {
+      whiteboard.onMessage(m)
     } else if (m.t === 'music-state' || m.t === 'music-error') {
       music.onMessage(m)
     } else if (m.t === 'peer-join') {
@@ -635,6 +701,7 @@ function toggleDance() {
 // ---------- input ----------
 addEventListener('keydown', (e) => {
   if ($('stage').hidden) return
+  if ($('whiteboardDialog').open) return
   if (document.activeElement?.matches('input, textarea, select') || document.activeElement?.closest('#reactionPicker, dialog')) return
   if (document.activeElement?.matches('button') && [' ', 'Enter'].includes(e.key)) return
   if (e.key.toLowerCase() === 'e') {
@@ -652,6 +719,7 @@ addEventListener('keydown', (e) => {
   keys.add(e.key.toLowerCase())
 })
 addEventListener('keyup', (e) => keys.delete(e.key.toLowerCase()))
+addEventListener('focus', () => send({ t: 'admin-status' }))
 
 canvas.addEventListener('pointerdown', (e) => {
   stopDancing()
@@ -663,19 +731,26 @@ canvas.addEventListener('pointerdown', (e) => {
 })
 
 // ---------- join / leave ----------
-$('joinBtn').onclick = async () => {
+async function joinOffice() {
   const btn = $('joinBtn')
   if (btn.disabled) return
   if (ws && ws.readyState <= 1) return // join already in progress
-  saveProfile()
+  clearTimeout(reconnectTimer)
+  clearTimeout(joinTimer)
+  if (!pendingResume) saveProfile()
   btn.disabled = true
   btn.textContent = 'joining…'
   $('lobbyErr').textContent = ''
-  const name = $('name').value.trim() || `user${Math.floor(Math.random() * 999)}`
-  me.name = name.slice(0, 24)
-  me.body = picked
-  me.x = 70 + Math.random() * 100
-  me.y = 330 + Math.random() * 60
+  if (pendingResume) {
+    const { seatReturn: previousSeat, cameraOff: previousCamera, muted: previousMute, ...player } = pendingResume
+    Object.assign(me, player)
+    seatReturn = previousSeat
+    cameraOff = previousCamera
+    muted = previousMute
+  } else {
+    const name = $('name').value.trim() || `user${Math.floor(Math.random() * 999)}`
+    Object.assign(me, { name: name.slice(0, 24), body: picked, appearance: normalizeAppearance(appearance), x: 70 + Math.random() * 100, y: 330 + Math.random() * 60 })
+  }
   // camera + mic required: no head or voice without them, no entry
   if (!localStream) {
     setStatus('asking for camera and microphone…', true)
@@ -684,6 +759,7 @@ $('joinBtn').onclick = async () => {
         video: { width: { ideal: 320 }, height: { ideal: 240 } },
         audio: { echoCancellation: true, noiseSuppression: true },
       })
+      updateMediaControls()
       $('selfVideo').srcObject = localStream
       // never hang on play(): some browsers stall it, video starts when it can
       await Promise.race([$('selfVideo').play().catch(() => {}), new Promise((r) => setTimeout(r, 4000))])
@@ -700,6 +776,8 @@ $('joinBtn').onclick = async () => {
       return
     }
   }
+  updateMediaControls()
+  saveMediaPreferences(localStorage, muted, cameraOff)
   setStatus('connecting…', true)
   try {
     const response = await fetch('/rtc-config', { signal: AbortSignal.timeout(10000) })
@@ -707,11 +785,12 @@ $('joinBtn').onclick = async () => {
     rtcCfg = await response.json()
   } catch {
     failJoin('Could not configure voice/video. Please try again.')
+    retryResume()
     return
   }
   await Promise.race([countryReady, new Promise((r) => setTimeout(r, 1200))])
   connect()
-  setTimeout(() => {
+  joinTimer = setTimeout(() => {
     if ($('stage').hidden && btn.disabled) {
       try {
         ws?.close()
@@ -720,43 +799,54 @@ $('joinBtn').onclick = async () => {
     }
   }, 10000)
 }
+$('joinBtn').onclick = () => void joinOffice()
 
 // tab close -> explicit close frame, server drops peer instantly
 addEventListener('beforeunload', () => {
+  leaving = true
+  clearTimeout(reconnectTimer)
+  clearTimeout(joinTimer)
   screenShare.reset()
   try {
     ws?.close()
   } catch {}
 })
 
-$('leaveBtn').onclick = () => { music.reset(); screenShare.reset(); location.reload() }
+$('leaveBtn').onclick = () => { leaving = true; clearReloadSession(sessionStorage); music.reset(); screenShare.reset(); location.reload() }
 $('sitBtn').onclick = toggleSit
 $('danceBtn').onclick = toggleDance
-$('handBtn').onclick = (e) => {
+function updateHandControl() {
+  $('handBtn').textContent = me.hand ? 'Lower hand' : 'Raise hand'
+  $('handBtn').setAttribute('aria-pressed', String(me.hand))
+  $('handBtn').title = me.hand ? 'Lower hand' : 'Raise hand'
+}
+$('handBtn').onclick = () => {
   me.hand = !me.hand
   send({ t: 'hand', hand: me.hand })
-  e.currentTarget.textContent = me.hand ? 'Lower hand' : 'Raise hand'
-  e.currentTarget.setAttribute('aria-pressed', String(me.hand))
-  e.currentTarget.title = me.hand ? 'Lower hand' : 'Raise hand'
+  updateHandControl()
 }
-$('muteBtn').onclick = (e) => {
-  muted = !muted
+function updateMediaControls() {
   me.muted = muted
+  localStream?.getAudioTracks().forEach((t) => (t.enabled = !muted))
+  localStream?.getVideoTracks().forEach((t) => (t.enabled = !cameraOff))
+  $('muteBtn').textContent = muted ? 'Mic off' : 'Mic on'
+  $('muteBtn').setAttribute('aria-pressed', String(muted))
+  $('muteBtn').title = muted ? 'Unmute microphone' : 'Mute microphone'
+  $('cameraBtn').textContent = cameraOff ? 'Camera off' : 'Camera on'
+  $('cameraBtn').setAttribute('aria-pressed', String(cameraOff))
+  $('cameraBtn').title = cameraOff ? 'Turn camera on' : 'Turn camera off'
+}
+$('muteBtn').onclick = () => {
+  muted = !muted
+  updateMediaControls()
+  saveMediaPreferences(localStorage, muted, cameraOff)
   send({ t: 'mute', muted })
   refreshRoster()
-  localStream?.getAudioTracks().forEach((t) => (t.enabled = !muted))
-  e.currentTarget.textContent = muted ? 'Mic off' : 'Mic on'
-  e.currentTarget.setAttribute('aria-pressed', String(muted))
-  e.currentTarget.title = muted ? 'Unmute microphone' : 'Mute microphone'
 }
-$('cameraBtn').onclick = (e) => {
-  const tracks = localStream?.getVideoTracks() ?? []
-  if (!tracks.length) return
-  const off = tracks[0].enabled
-  tracks.forEach((track) => { track.enabled = !off })
-  e.currentTarget.textContent = off ? 'Camera off' : 'Camera on'
-  e.currentTarget.setAttribute('aria-pressed', String(off))
-  e.currentTarget.title = off ? 'Turn camera on' : 'Turn camera off'
+$('cameraBtn').onclick = () => {
+  cameraOff = !cameraOff
+  updateMediaControls()
+  saveMediaPreferences(localStorage, muted, cameraOff)
 }
 $('chatForm').onsubmit = (e) => {
   e.preventDefault()
@@ -1130,6 +1220,7 @@ function tick(now) {
     me.y = Math.max(40, Math.min(WORLD.h - 30, me.y))
     screenShare.update()
     music.update()
+    whiteboard.update()
     if (me.dancing && musicVolume(me) <= 0) stopDancing()
     me.moving = !me.sitting && Math.hypot(me.x - oldX, me.y - oldY) > 0.01
     if (Math.abs(me.x - oldX) > 0.01) me.facing = Math.sign(me.x - oldX)
@@ -1262,3 +1353,4 @@ setInterval(() => {
 }, 2000)
 
 requestAnimationFrame(tick)
+if (pendingResume) void joinOffice()
