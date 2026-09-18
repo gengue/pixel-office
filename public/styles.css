@@ -15,7 +15,7 @@ input { width: 100%; margin-top: 6px; padding: 10px; border-radius: 10px; border
 .bodies { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 8px; }
 .bodyOpt { border: 2px solid var(--line); border-radius: 12px; background: #f4f3eb; padding: 8px; cursor: pointer; text-align: center; }
 .bodyOpt.sel { border-color: var(--acc); }
-.bodyOpt canvas { image-rendering: pixelated; width: 48px; height: 64px; }
+.bodyOpt canvas { image-rendering: pixelated; width: 64px; height: 64px; }
 .bodyOpt span { display: block; font-size: 12px; color: var(--dim); }
 .avatarStyle { margin: 18px 0; padding: 12px; border: 1px solid var(--line); border-radius: 12px; }
 .avatarStyle legend { padding: 0 6px; font-weight: 600; }

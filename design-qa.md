@@ -2,7 +2,7 @@
 
 final result: passed
 
-Scope: isolated `/proposals/avatars.html` study, not a replacement for production avatars. One forest outfit, four cardinal views (left mirrors right), four whole-body walking poses per direction with shared timing, idle and seated poses. Eight-direction art and the other outfits remain outside this first approval preview. The chronological corrections below record superseded attempts; the final whole-body correction is the current implementation.
+Scope: all six detailed characters integrated into the office and its lobby. The shared renderer also powers `/proposals/avatars.html`. Four cardinal views (left mirrors right), four walking poses per direction, idle and seated poses. Vertical cadence remains eight changes/second; lateral cadence is seven changes/second, 12.5% slower. The previous pixel bodies remain an image-loading/error fallback and an explicit prototype comparison. Earlier entries below document superseded iterations.
 
 ## Evidence
 
@@ -101,3 +101,18 @@ final result: passed
 The user prefers the newer artwork but finds the eight-pose lateral playback too busy/fast relative to the approved vertical walk. Kept the newer atlas and selected only contact/passing poses 0, 2, 4 and 6. Side rendering now consumes the same four-pose `frame` value as front/back; removed the additional intermediate beats. No art regeneration or vertical movement change.
 
 The browser regression failed before this adjustment because lateral frames changed twice as often. Afterward every direction has exactly four distinct poses and identical frame-change timestamps: eight changes per second at normal speed, twelve at 150%. Full cycle duration remains equal. Build, browser interaction checks and diff check passed. Latest screenshot: `/tmp/avatar-side-smooth.png`. This entry supersedes the previous eight-pose playback description; all eight source poses remain in the asset, but only four are played.
+
+
+## Office integration and complete character set
+
+The user approved integration, explicitly requested replacing both human bodies, then requested matching orc, lizard, robot and ghost versions. All six now use the shared `public/avatar-art.js` renderer with assets under `public/assets/`. The two humans share the approved body with different original outfit colors. Added textured orc armor, a scaled lizard tail, articulated robot metalwork and a flowing ghost robe. Existing outfit choices and accessories remain available.
+
+Rejected lateral sheets with frozen arms; final lateral atlases preserve the approved contact/passing silhouettes and reciprocal arm swing. Kept the human front/back artwork unchanged. Corrected orc backpack continuity, anchored every view at the collar to avoid tail-induced head displacement, and widened lobby canvases to avoid clipping.
+
+Fresh visual evidence: `/tmp/avatar-all-artwork.png` shows all six characters in four directions and seated at the same scale; `/tmp/avatar-all-lobby.png` shows the actual lobby. Actual office captures and recordings are under `/tmp/avatar-office-*-seated.png`, `/tmp/avatar-office-*-dance.png` and `/tmp/human-office-video/`. Inspected head attachment, material depth, complete silhouettes, sofa placement, color variants and scene scale. All lobby sprites have more than 100 distinct colors and zero opaque pixels on their canvas borders.
+
+Independent review found tint-cache thrashing with nine color/atlas combinations and a prototype-wide failure gate. Both are fixed. The cache regression demonstrates 18 recolors with eviction versus nine across two frames after the fix. A browser check aborts robot assets, confirms a usable fallback, then switches successfully to a loaded human.
+
+Verification: 28 Bun tests passed with 7,373 assertions in an isolated source copy. The direct workspace suite still encounters the pre-existing malformed local admin credential; it was left untouched. Both Playwright scripts pass: six character selections, original/ocean colors and accessories, local/remote directions, sitting and dancing, synthetic live camera, mobile layout, reduced-motion mode, four distinct repeating poses, approved vertical timing and slower lateral timing. No browser page errors. Production build and diff checks passed.
+
+final result: passed

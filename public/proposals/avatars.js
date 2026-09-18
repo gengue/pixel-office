@@ -2,20 +2,16 @@ import { WORLD, walls, furn } from '../world.js'
 import { ROOMS } from '../rooms.js'
 import { createOfficeArt } from '../office-art.js'
 import { drawBody } from '../avatars.js'
+import { loadAvatarArt } from '../avatar-art.js'
 
 const $ = id => document.getElementById(id)
 const scene = $('scene').getContext('2d')
 const detail = $('detail').getContext('2d')
 const office = createOfficeArt(WORLD, ROOMS, walls, furn)
-const atlas = new Image()
-const sideAtlas = new Image()
 const reference = new Image()
 const video = document.createElement('video')
 video.autoplay = video.muted = video.playsInline = true
 const state = { walking: !matchMedia('(prefers-reduced-motion: reduce)').matches, sitting:false, direction:'auto', speed:1, distance:0, travel:0, velocity:0, stream:null }
-const cells = []
-const sideCells = []
-let loaded = false
 
 function updateControls() {
   $('walk').setAttribute('aria-pressed', String(state.walking))
@@ -53,43 +49,18 @@ $('camera').onclick = async () => {
 }
 addEventListener('pagehide', stopCamera)
 
-function measureCells(image, columns, rows, target, columnEdges) {
-  // Measure each transparent cell once; keep source proportions and a shared scale.
-  const sample = document.createElement('canvas')
-  sample.width = image.width; sample.height = image.height
-  const context = sample.getContext('2d', { willReadFrequently:true })
-  context.drawImage(image, 0, 0)
-  const { data } = context.getImageData(0, 0, image.width, image.height)
-  for (let row = 0; row < rows; row++) for (let col = 0; col < columns; col++) {
-    const sx = Math.floor((columnEdges?.[col] ?? col / columns) * image.width), sy = Math.floor(row * image.height / rows)
-    const w = Math.floor((columnEdges?.[col + 1] ?? (col + 1) / columns) * image.width) - sx, h = Math.floor((row + 1) * image.height / rows) - sy
-    let left = w, top = h, right = 0, bottom = 0
-    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
-      if (data[((sy + y) * image.width + sx + x) * 4 + 3] < 32) continue
-      left = Math.min(left, x); top = Math.min(top, y); right = Math.max(right, x); bottom = Math.max(bottom, y)
-    }
-    const crop = [sx + left, sy + top, right - left + 1, bottom - top + 1]
-    // Anchor each side pose at its collar, not the changing stride width.
-    let neckLeft = right, neckRight = left
-    for (let y = top; y < top + crop[3] * .04; y++) for (let x = left; x <= right; x++) {
-      if (data[((sy + y) * image.width + sx + x) * 4 + 3] < 32) continue
-      neckLeft = Math.min(neckLeft, x); neckRight = Math.max(neckRight, x)
-    }
-    crop.neckX = (neckLeft + neckRight) / 2 - left
-    target.push(crop)
-  }
-  loaded = cells.length > 0 && sideCells.length > 0
-  if (loaded) $('status').textContent = 'Listo para probar.'
+function loadCharacter() {
+  const kind = $('character').value
+  $('status').textContent = 'Cargando personaje…'
+  loadAvatarArt(kind).then(ready => {
+    if ($('character').value === kind) $('status').textContent = ready ? 'Listo para probar.' : 'No se pudo cargar este personaje. Se muestra el cuerpo anterior.'
+  })
 }
-atlas.onload = () => measureCells(atlas, 4, 4, cells)
-// Measured gutters keep extended boots inside their complete pose.
-sideAtlas.onload = () => measureCells(sideAtlas, 4, 2, sideCells, [0, .27, .52, .755, 1])
-atlas.onerror = sideAtlas.onerror = reference.onerror = () => { $('status').textContent = 'No se pudieron cargar las imágenes. Recarga la página.' }
-atlas.src = './avatar-atlas.png'
-sideAtlas.src = './avatar-side-walk-eight.png'
+$('character').onchange = loadCharacter
+loadCharacter()
 reference.src = './avatar-reference.png'
 
-function avatar(ctx, x, footY, facing, frame) {
+function avatar(ctx, x, footY, facing) {
   const sitting = state.sitting
   const moving = !sitting && state.velocity > 1
   const original = $('original').checked
@@ -100,22 +71,12 @@ function avatar(ctx, x, footY, facing, frame) {
   if (sitting && office.ready) office.draw(ctx, { type:'chair', x:-25, y:-64, w:50, h:66 })
   let headY = sitting ? -65 : -90
   if (original) {
-    drawBody(ctx, 'hombre', -24, sitting ? -44 : -60, 4, state.distance / 10, sitting, { motion:moving ? 1 : 0, facing:facing === 'left' ? -1 : 1, appearance:{ color:'forest', accessory:'satchel' } })
+    drawBody(ctx, $('character').value, -24, sitting ? -44 : -60, 4, state.distance / 10, sitting, { motion:moving ? 1 : 0, facing:facing === 'left' ? -1 : 1, classic:true, appearance:{ color:'forest', accessory:'satchel' } })
     headY = sitting ? -58 : -74
   } else {
-    const row = facing === 'back' ? 2 : facing === 'front' ? 0 : 1
-    const sideWalk = moving && row === 1
-    const index = sitting ? 13 : moving ? row * 4 + frame : facing === 'back' ? 15 : facing === 'front' ? 12 : 14
-    // Keep the newer contact/passing art, using the approved four-pose vertical beat.
-    const crop = sideWalk ? sideCells[frame * 2] : cells[index]
-    const scale = 68 / (sideWalk ? sideCells[0][3] : cells[12][3])
-    const width = crop[2] * scale, height = crop[3] * scale
-    ctx.save()
-    // The front/back contacts share a leading leg; mirror the second half-cycle.
-    if (!sitting && (facing === 'left' || moving && row !== 1 && frame >= 2)) ctx.scale(-1, 1)
-    ctx.drawImage(sideWalk ? sideAtlas : atlas, ...crop, sideWalk ? -crop.neckX * scale : -width / 2, -height, width, height)
-    ctx.restore()
-    headY = -height - 16
+    const bodyY = sitting ? -48 : -68
+    const offset = drawBody(ctx, $('character').value, sitting ? -24 : -25.5, bodyY, sitting ? 4 : 4.25, state.distance / 8, sitting, { direction:facing, motion:moving ? 1 : 0 }) ?? 0
+    headY = bodyY + offset - 16
   }
   ctx.save()
   ctx.beginPath(); ctx.arc(0, headY, 22, 0, Math.PI * 2); ctx.clip()
@@ -142,7 +103,6 @@ function render(now) {
   const x = travel < 420 ? 620 + travel : travel < 480 ? 1040 : travel < 900 ? 1040 - (travel - 480) : 620
   const y = travel < 420 ? 420 : travel < 480 ? 420 + travel - 420 : travel < 900 ? 480 : 480 - (travel - 900)
   const facing = state.direction === 'auto' ? travel < 420 ? 'right' : travel < 480 ? 'front' : travel < 900 ? 'left' : 'back' : state.direction
-  const frame = Math.floor(state.distance / 10) % 4
   scene.imageSmoothingEnabled = detail.imageSmoothingEnabled = false
   scene.clearRect(0, 0, 880, 520)
   if (office.ready) {
@@ -150,14 +110,14 @@ function render(now) {
     office.ground(scene)
     let drawn = false
     for (const object of office.objects) {
-      if (!drawn && object.bottom > y && loaded) { avatar(scene, x, y, facing, frame); drawn = true }
+      if (!drawn && object.bottom > y) { avatar(scene, x, y, facing); drawn = true }
       office.draw(scene, object)
     }
-    if (!drawn && loaded) avatar(scene, x, y, facing, frame)
+    if (!drawn) avatar(scene, x, y, facing)
     scene.restore()
   }
   detail.clearRect(0, 0, 600, 560)
-  if (loaded) { detail.save(); detail.translate(300, 490); detail.scale(4.5, 4.5); avatar(detail, 0, 0, facing, frame); detail.restore() }
+  { detail.save(); detail.translate(300, 490); detail.scale(4.5, 4.5); avatar(detail, 0, 0, facing); detail.restore() }
   requestAnimationFrame(render)
 }
 requestAnimationFrame(render)

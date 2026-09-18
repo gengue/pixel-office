@@ -56,10 +56,12 @@ try {
   })
   await motion.goto(url)
   await motion.getByText('Listo para probar.', { exact:true }).waitFor()
-  for (const speed of [100, 150]) {
+  for (const character of ['hombre', 'mujer', 'orco', 'lagarto', 'robot', 'fantasma']) for (const speed of character === 'hombre' ? [100, 150] : [100]) {
     let approvedTiming
     for (const direction of ['front', 'back', 'right', 'left']) {
       await motion.reload()
+      await motion.getByText('Listo para probar.', { exact:true }).waitFor()
+      await motion.locator('#character').selectOption(character)
       await motion.getByText('Listo para probar.', { exact:true }).waitFor()
       await motion.locator('#direction').selectOption(direction)
       await motion.locator('#speed').fill(String(speed))
@@ -82,14 +84,28 @@ try {
         return { changes, poses:poses.size, cycleMatches }
       }, speed)
       approvedTiming ??= result.changes
-      assert(result.cycleMatches, `${direction}: cycle duration must match the approved front/back walk`)
-      assert.deepEqual(result.changes, approvedTiming, `${direction}: pose changes must match approved vertical pacing`)
+      const lateral = direction === 'left' || direction === 'right'
+      if (!lateral) {
+        assert(result.cycleMatches, `${direction}: approved vertical cycle must stay unchanged`)
+        assert.deepEqual(result.changes, approvedTiming, `${direction}: approved vertical timing must stay unchanged`)
+      } else assert(Math.abs(result.changes.length - 7 * speed / 100) <= 1, `${direction}: lateral walk must be 12.5% slower`)
       assert.equal(result.poses, 4, `${direction}: four key poses must repeat without deformation`)
-      console.log(`${direction} ${speed}%: ${result.poses} poses, ${result.changes.length} changes/second; full-cycle timing matches front`)
+      console.log(`${character} ${direction} ${speed}%: ${result.poses} poses, ${result.changes.length} changes/second`)
     }
   }
   await motion.screenshot({ path:'/tmp/avatar-side-smooth.png', fullPage:true })
   await motion.close()
+  const failure = await context.newPage()
+  failure.on('pageerror', error => errors.push(error.message))
+  await failure.route('**/assets/robot-*.png', route => route.abort())
+  await failure.goto(url)
+  await failure.getByText('Listo para probar.', { exact:true }).waitFor()
+  await failure.locator('#character').selectOption('robot')
+  await failure.getByText('No se pudo cargar este personaje. Se muestra el cuerpo anterior.', { exact:true }).waitFor()
+  assert(await failure.locator('#detail').evaluate(c => c.getContext('2d').getImageData(0, 0, c.width, c.height).data.some(value => value > 0)), 'Failed art must retain the old body fallback')
+  await failure.locator('#character').selectOption('hombre')
+  await failure.getByText('Listo para probar.', { exact:true }).waitFor()
+  await failure.close()
   assert.deepEqual(errors, [], 'No browser errors')
   console.log('Avatar preview: animation, pause, directions, seated pose, comparison, camera, mobile and reduced motion passed.')
 } finally { await browser.close() }

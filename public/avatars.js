@@ -1,3 +1,5 @@
+import { drawAvatarBody } from './avatar-art.js'
+
 // Pixel bodies 12x16. '.' is transparent; the webcam head is drawn separately.
 export const BODIES = {
   hombre: {
@@ -157,16 +159,19 @@ export function normalizeAppearance(value) {
 export function drawBody(ctx, kind, px, py, scale = 4, walk = 0, sitting = false, options = {}) {
   const def = BODIES[kind] ?? BODIES.hombre
   const appearance = normalizeAppearance(options.appearance)
+  const color = OUTFIT_COLORS[appearance.color].C ?? (kind === 'mujer' ? OUTFIT_COLORS.rose.C : undefined)
+  const detailedOffset = !options.classic ? drawAvatarBody(ctx, px, py, scale, walk, sitting, { ...options, kind, color }) : null
+  py += detailedOffset ?? 0
   const pal = { ...def.palette, ...(def.extra ?? {}), ...OUTFIT_COLORS[appearance.color] }
   const motion = sitting ? 0 : (options.motion ?? 0)
   const dancing = options.dancing && !sitting
   const stride = dancing ? Math.sin((options.time ?? 0) * 6) : Math.sin(walk) * motion
-  const bob = sitting ? 0 : Math.abs(Math.sin(walk * 2)) * motion * 1.5 + Math.sin((options.time ?? 0) * 2) * (1 - motion) * 0.6
+  const bob = sitting || detailedOffset !== null ? 0 : Math.abs(Math.sin(walk * 2)) * motion * 1.5 + Math.sin((options.time ?? 0) * 2) * (1 - motion) * 0.6
   const pixel = (x, y, w = 1, h = 1) => ctx.fillRect(
     Math.round(px + (options.facing === -1 ? 12 - x - w : x) * scale),
     Math.round(py + y * scale - bob), w * scale, h * scale,
   )
-  for (let r = 0; r < def.rows.length; r++) {
+  for (let r = 0; detailedOffset === null && r < def.rows.length; r++) {
     // Fold the legs into a short seated pose, preserving each body's palette.
     if (sitting && r >= 10 && r <= 12) continue
     const rowY = sitting && r > 12 ? r - 3 : r
@@ -196,6 +201,7 @@ export function drawBody(ctx, kind, px, py, scale = 4, walk = 0, sitting = false
     ctx.fillStyle = '#e4c678'
     pixel(9, 7)
   }
+  return detailedOffset ?? 0
 }
 
 export function bodySize(scale = 4) {
@@ -205,9 +211,9 @@ export function bodySize(scale = 4) {
 export function renderPreview(canvas, kind, appearance = {}, time = 0, moving = false) {
   const ctx = canvas.getContext('2d')
   const s = 6
-  canvas.width = 12 * s
+  canvas.width = 16 * s
   canvas.height = 16 * s
   ctx.imageSmoothingEnabled = false
   ctx.clearRect(0, 0, canvas.width, canvas.height)
-  drawBody(ctx, kind, 0, 4, s, time * 9, false, { appearance, time, motion: moving ? 1 : 0 })
+  drawBody(ctx, kind, 15, 4, 5.5, time * 10, false, { appearance, time, motion: moving ? 1 : 0 })
 }

@@ -1,3 +1,4 @@
+import { loadAvatarArt, movementDirection } from './avatar-art.js'
 import { drawTeleport } from './teleport.js'
 import { pathToPerson } from './navigation.js'
 import { WORLD, BODY_R, walls, furn, hitsSolid } from './world.js'
@@ -88,13 +89,13 @@ for (const kind of BODY_KINDS) {
     for (const el of bodiesEl.children) {
       el.classList.toggle('sel', el === b)
       el.setAttribute('aria-pressed', String(el === b))
-      renderPreview(el.querySelector('canvas'), el.dataset.kind, appearance)
     }
-    saveProfile()
+    refreshAppearance()
   }
   bodiesEl.append(b)
 }
 const refreshAppearance = () => {
+  $('accessory').options[0].text = ['hombre', 'mujer', 'orco'].includes(picked) ? 'None (built-in backpack)' : 'None'
   for (const el of bodiesEl.children) renderPreview(el.querySelector('canvas'), el.dataset.kind, appearance)
   for (const el of $('outfitColors').children) el.setAttribute('aria-pressed', String(el.dataset.color === appearance.color))
   saveProfile()
@@ -114,6 +115,8 @@ for (const [color, outfit] of Object.entries(OUTFIT_COLORS)) {
 for (const [value, label] of Object.entries(ACCESSORIES)) $('accessory').add(new Option(label, value))
 $('accessory').value = appearance.accessory
 $('accessory').onchange = () => { appearance.accessory = $('accessory').value; refreshAppearance() }
+refreshAppearance()
+loadAvatarArt().then(refreshAppearance)
 
 let localStream = null
 
@@ -1127,12 +1130,12 @@ function drawAvatar(p, videoEl, isMe, inCall, now) {
     ctx.arc(cx, bodyY + 10, 52, 0, 7)
     ctx.stroke()
   }
-  drawBody(ctx, p.body, cx - bw / 2, bodyY, s, p.walk, p.sitting, {
-    appearance: p.appearance, facing: p.facing, motion: reducedMotion.matches ? 0 : p.motion,
+  const headOffset = drawBody(ctx, p.body, cx - bw / 2, bodyY, s, p.walk, p.sitting, {
+    appearance: p.appearance, facing: p.facing, direction: p.direction, motion: reducedMotion.matches ? 0 : p.motion,
     time: reducedMotion.matches ? 0 : now / 1000,
     dancing: p.dancing,
   })
-  drawHead(cx, bodyY - headR + 6, headR, videoEl, initialsOf(p.name || '?'))
+  drawHead(cx, bodyY + headOffset - headR + 6, headR, videoEl, initialsOf(p.name || '?'))
   // nametag
   ctx.font = 'bold 12px system-ui'
   const label = `${p.muted ? '🔇 ' : ''}${p.dancing ? '♫ ' : ''}${p.name}${isMe ? ' (you)' : ''}`
@@ -1224,6 +1227,7 @@ function tick(now) {
     if (me.dancing && musicVolume(me) <= 0) stopDancing()
     me.moving = !me.sitting && Math.hypot(me.x - oldX, me.y - oldY) > 0.01
     if (Math.abs(me.x - oldX) > 0.01) me.facing = Math.sign(me.x - oldX)
+    if (me.moving) me.direction = movementDirection(me.x - oldX, me.y - oldY, me.direction)
     // camera follows avatar
     const tx = Math.max(0, Math.min(WORLD.w - VIEW.w, me.x - VIEW.w / 2))
     const ty = Math.max(0, Math.min(WORLD.h - VIEW.h, me.y - VIEW.h / 2))
@@ -1243,6 +1247,7 @@ function tick(now) {
           p.x += dx * Math.min(1, dt * 10)
           p.y += dy * Math.min(1, dt * 10)
           p.moving = d > 3
+          if (p.moving) p.direction = movementDirection(dx, dy, p.direction)
           if (Math.abs(dx) > 1) p.facing = Math.sign(dx)
         } else p.moving = false
       }

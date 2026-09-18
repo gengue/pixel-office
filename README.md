@@ -154,6 +154,15 @@ bun test
 
 Tests cover artwork bounds, seats, avatar validation, voice range, early ICE
 candidates, screen audience enforcement, reaction validation and viewer lifecycle.
+The optional Playwright checks exercise the built office with synthetic cameras:
+
+```sh
+node scripts/check-avatar-preview.mjs
+node scripts/check-avatar-office.mjs
+```
+
+Set `PLAYWRIGHT_MODULE` to an existing Playwright module if it is not installed
+locally; `PREVIEW_URL` and `OFFICE_URL` override the preview and office URLs.
 
 ## Structure
 
@@ -163,10 +172,13 @@ candidates, screen audience enforcement, reaction validation and viewer lifecycl
 - `public/world.js`: shared furniture, walls and collision geometry.
 - `public/meeting-links.js`: URL parsing, link creation and safe arrival resolution.
 - `public/screen-share.js`: display capture and separate presentation connections.
-- `public/office-art.js`, `avatars.js`, `seating.js`: artwork, bodies and usable seats.
+- `public/office-art.js`, `avatars.js`, `avatar-art.js`, `seating.js`: office art, avatar choices, shared sprite animation and usable seats.
 - `public/rooms.js`, `voice.js`, `reactions.js`: shared room and interaction rules.
 
-The three furniture atlases are original AI-generated assets. The basic renderer
+The furniture and detailed character atlases are original AI-generated assets.
+All six characters share four-view walking, idle and seated poses; the live camera
+remains separate. `/proposals/avatars.html` previews every character and compares
+it with the previous body. Human and orc outfits include a built-in backpack. The basic renderer
 keeps the office usable while images load or if they fail. Reduced-motion settings
 suppress decorative animation.
 
