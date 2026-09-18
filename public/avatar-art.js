@@ -5,6 +5,16 @@ let danceLoading
 const artKind = kind => kind === 'hombre' || kind === 'mujer' ? 'human' : kind
 
 export const walkFrame = (walk, direction) => Math.floor(walk * (direction === 'left' || direction === 'right' ? .7 : .8)) % 4
+export function transformDanceHead(ctx, kind, dancing, sitting, time, x, y) {
+  if (kind !== 'fantasma' || !dancing || sitting || !time) return
+  const beat = time * Math.PI * 4
+  // Pivot at the collar so the live face stays attached during each headbang.
+  ctx.translate(x, y + 16)
+  ctx.rotate(Math.sin(beat) * .4)
+  ctx.scale(1, 1 - (1 - Math.cos(beat)) * .11)
+  ctx.translate(-x, -y - 16)
+}
+
 export function movementDirection(dx, dy, previous = 'front') {
   if (Math.hypot(dx, dy) < .01) return previous
   return Math.abs(dx) > Math.abs(dy) ? dx < 0 ? 'left' : 'right' : dy < 0 ? 'back' : 'front'
@@ -58,7 +68,7 @@ function loadDanceArt() {
       try {
         // Row gutters are measured from the shared five-character dance sheet.
         const edges = [0, 282, 546, 808, 1095, 1402]
-        Object.values(artwork).forEach((art, row) => {
+        Object.values(artwork).slice(0, 4).forEach((art, row) => {
           const canvas = document.createElement('canvas')
           canvas.width = image.width; canvas.height = edges[row + 1] - edges[row]
           canvas.src = `${image.src}#${row}`
@@ -80,12 +90,13 @@ export function loadAvatarArt(kind) {
   const name = artKind(kind), art = artwork[name]
   if (!art) return Promise.resolve(false)
   const sources = [[`${name}-atlas.png`, 4, art.cells]]
+  if (name === 'fantasma') sources.push(['fantasma-metal-dance.png', 1, art.danceCells, [0, 564 / 2172, 1108 / 2172, 1608 / 2172, 1], true])
   if (name !== 'fantasma') sources.push([`${name}-side-walk.png`, 2, art.sideCells, [0, .27, .52, .755, 1]])
-  return art.loading ??= Promise.all([loadDanceArt(), ...sources.map(([file, rows, target, edges], index) => new Promise((resolve, reject) => {
+  return art.loading ??= Promise.all([loadDanceArt(), ...sources.map(([file, rows, target, edges, raisedArms], index) => new Promise((resolve, reject) => {
     const image = new Image()
-    if (index) art.sideAtlas = image; else art.atlas = image
+    if (raisedArms) art.danceAtlas = image; else if (index) art.sideAtlas = image; else art.atlas = image
     image.onload = () => {
-      try { measureCells(image, 4, rows, target, edges); resolve() } catch (error) { reject(error) }
+      try { measureCells(image, 4, rows, target, edges, raisedArms); resolve() } catch (error) { reject(error) }
     }
     image.onerror = reject
     image.src = `/assets/${file}`

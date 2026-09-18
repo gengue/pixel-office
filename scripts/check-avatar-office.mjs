@@ -8,8 +8,10 @@ try {
  await ctx.addInitScript(() => {
    const draw = CanvasRenderingContext2D.prototype.drawImage
    window.danceDraws = 0
+   window.headTilts = 0
    CanvasRenderingContext2D.prototype.drawImage = function(source, ...args) {
-     if (this.canvas.id === 'map' && source.width === 1122 && source.height < 400) window.danceDraws++
+     if (this.canvas.id === 'map' && (source.width === 1122 && source.height < 400 || source.width === 2172 && source.height === 724)) window.danceDraws++
+     if (this.canvas.id === 'map' && source instanceof HTMLVideoElement && Math.abs(this.getTransform().b) > .05) window.headTilts++
      return draw.call(this, source, ...args)
    }
  })
@@ -84,6 +86,16 @@ try {
    await guest.locator('#danceBtn').waitFor({state:'visible'});await guest.locator('#danceBtn').click()
    await a.waitForFunction(k=>[...__po.peers.values()].some(p=>p.name===k&&p.dancing),kind)
    await guest.waitForFunction(()=>window.danceDraws>0)
+   if (kind === 'fantasma') {
+     await guest.waitForFunction(()=>window.headTilts>0)
+     await b.waitForFunction(()=>window.headTilts>0)
+     await guest.emulateMedia({reducedMotion:'reduce'})
+     await guest.waitForTimeout(100)
+     await guest.evaluate(()=>window.headTilts=0)
+     await guest.waitForTimeout(300)
+     assert.equal(await guest.evaluate(()=>window.headTilts),0,'Reduced motion must stop headbanging')
+     await guest.emulateMedia({reducedMotion:'no-preference'})
+   }
    await guest.waitForFunction(()=>__po.me.y-__po.cam.y<__po.VIEW.h-90)
    await guest.screenshot({path:`/tmp/avatar-office-${kind}-dance.png`})
    await guest.close()

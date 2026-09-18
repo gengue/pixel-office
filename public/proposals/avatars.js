@@ -2,7 +2,7 @@ import { WORLD, walls, furn } from '../world.js'
 import { ROOMS } from '../rooms.js'
 import { createOfficeArt } from '../office-art.js'
 import { drawBody } from '../avatars.js'
-import { loadAvatarArt } from '../avatar-art.js'
+import { loadAvatarArt, transformDanceHead } from '../avatar-art.js'
 
 const $ = id => document.getElementById(id)
 const scene = $('scene').getContext('2d')
@@ -82,6 +82,8 @@ function avatar(ctx, x, footY, facing) {
     headY = bodyY + offset - 16
   }
   ctx.save()
+  if (!original) transformDanceHead(ctx, $('character').value, state.dancing, sitting, state.danceTime, 0, headY)
+  ctx.save()
   ctx.beginPath(); ctx.arc(0, headY, 22, 0, Math.PI * 2); ctx.clip()
   if (state.stream && video.readyState >= 2) {
     const side = Math.min(video.videoWidth, video.videoHeight)
@@ -92,6 +94,7 @@ function avatar(ctx, x, footY, facing) {
   ctx.restore()
   ctx.strokeStyle = '#456b56'; ctx.lineWidth = 1.5
   ctx.beginPath(); ctx.arc(0, headY, 22, 0, Math.PI * 2); ctx.stroke()
+  ctx.restore()
   ctx.restore()
 }
 

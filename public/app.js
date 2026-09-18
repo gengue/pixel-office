@@ -1,4 +1,4 @@
-import { loadAvatarArt, movementDirection } from './avatar-art.js'
+import { loadAvatarArt, movementDirection, transformDanceHead } from './avatar-art.js'
 import { drawTeleport } from './teleport.js'
 import { pathToPerson } from './navigation.js'
 import { WORLD, BODY_R, walls, furn, hitsSolid } from './world.js'
@@ -1135,7 +1135,11 @@ function drawAvatar(p, videoEl, isMe, inCall, now) {
     time: reducedMotion.matches ? 0 : now / 1000,
     dancing: p.dancing,
   })
-  drawHead(cx, bodyY + headOffset - headR + 6, headR, videoEl, initialsOf(p.name || '?'))
+  const headY = bodyY + headOffset - headR + 6
+  ctx.save()
+  transformDanceHead(ctx, p.body, p.dancing, p.sitting, reducedMotion.matches ? 0 : now / 1000, cx, headY)
+  drawHead(cx, headY, headR, videoEl, initialsOf(p.name || '?'))
+  ctx.restore()
   // nametag
   ctx.font = 'bold 12px system-ui'
   const label = `${p.muted ? '🔇 ' : ''}${p.dancing ? '♫ ' : ''}${p.name}${isMe ? ' (you)' : ''}`

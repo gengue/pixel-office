@@ -123,3 +123,11 @@ final result: passed
 The previous office check verified shared dance state but missed that the detailed renderer reused walking poses. Added a real-browser regression that failed on that behavior. All six characters now use four dedicated dance poses from one shared atlas; the humans share a row with their respective outfit colors. Collar anchors account for raised hands, while feet stay grounded. Sitting overrides dancing and reduced motion holds a static pose.
 
 The dance regression now checks decoded artwork, animation, distinctness from walking and seated precedence. Office checks also assert that the dance artwork is drawn locally and remotely. The prototype includes a dance control with normal and reduced-motion checks. Reviewed the 24-pose contact sheet and actual office screenshots and recordings. The focused browser check and full office check pass; 28 Bun tests pass with 7,373 assertions in an isolated source copy (the existing local admin credential is unchanged).
+
+
+## Ghost metal dance
+
+The ghost now has a separate four-pose atlas with rock hand gestures, hunched shoulders and a swirling robe. Its live webcam face pivots at the collar and compresses vertically twice per second to headbang; other characters keep their existing dance. Sitting and reduced-motion mode suppress the head movement.
+
+Reviewed the actual prototype recording under `/tmp/ghost-metal-video/` and its eight-frame motion strip `/tmp/ghost-metal-motion.png`: the face stays attached, all four silhouettes are complete, and robe/head movement is visible at office scale. Used the existing Node Playwright recorder because the Watch Skill loop command reports its missing Python Playwright dependency. Atlas gutters are measured to avoid clipping raised fingers. Focused dance browser checks and 29 Bun tests (7,378 assertions in an isolated source copy) pass.
+The full office browser check also passes, including local/remote webcam head rotation and stopping headbanging under reduced motion. Prototype controls, all six walking cycles, and existing character colors/accessories pass without page errors. Production build passes.

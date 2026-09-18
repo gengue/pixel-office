@@ -1,5 +1,5 @@
 import { test, expect } from 'bun:test'
-import { walkFrame, movementDirection, coloredImage } from '../public/avatar-art.js'
+import { walkFrame, movementDirection, coloredImage, transformDanceHead } from '../public/avatar-art.js'
 
 test('detailed avatars keep four poses with a slower lateral cadence and retain direction at rest', () => {
   const changes = direction => {
@@ -40,4 +40,20 @@ test('recoloring nine atlas variants is cached across animation frames', () => {
     if (previous === undefined) delete globalThis.document
     else globalThis.document = previous
   }
+})
+
+
+test('only a dancing ghost headbangs, with a fixed collar and static reduced motion', () => {
+  const calls = []
+  const ctx = { translate:(...args) => calls.push(['translate', ...args]), rotate:a => calls.push(['rotate', a]), scale:(...args) => calls.push(['scale', ...args]) }
+  for (const kind of ['hombre', 'mujer', 'orco', 'lagarto', 'robot']) transformDanceHead(ctx, kind, true, false, .125, 50, 80)
+  transformDanceHead(ctx, 'fantasma', false, false, .125, 50, 80)
+  transformDanceHead(ctx, 'fantasma', true, true, .125, 50, 80)
+  transformDanceHead(ctx, 'fantasma', true, false, 0, 50, 80)
+  expect(calls).toEqual([])
+  transformDanceHead(ctx, 'fantasma', true, false, .125, 50, 80)
+  expect(calls[0]).toEqual(['translate', 50, 96])
+  expect(calls[1][1]).toBeCloseTo(.4)
+  expect(calls[2][2]).toBeCloseTo(.89)
+  expect(calls[3]).toEqual(['translate', -50, -96])
 })
