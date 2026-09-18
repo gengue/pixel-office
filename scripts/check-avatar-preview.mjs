@@ -82,13 +82,9 @@ try {
         return { changes, poses:poses.size, cycleMatches }
       }, speed)
       approvedTiming ??= result.changes
-      const lateral = direction === 'right' || direction === 'left'
       assert(result.cycleMatches, `${direction}: cycle duration must match the approved front/back walk`)
-      if (lateral) {
-        assert(approvedTiming.every(frame => result.changes.includes(frame)), `${direction}: intermediate poses must preserve shared beat boundaries`)
-        assert.equal(result.changes.length, approvedTiming.length * 2, `${direction}: one added in-between per original pose`)
-      } else assert.deepEqual(result.changes, approvedTiming, `${direction}: approved vertical timing must stay unchanged`)
-      assert.equal(result.poses, lateral ? 8 : 4, `${direction}: complete, distinct poses must repeat without deformation`)
+      assert.deepEqual(result.changes, approvedTiming, `${direction}: pose changes must match approved vertical pacing`)
+      assert.equal(result.poses, 4, `${direction}: four key poses must repeat without deformation`)
       console.log(`${direction} ${speed}%: ${result.poses} poses, ${result.changes.length} changes/second; full-cycle timing matches front`)
     }
   }

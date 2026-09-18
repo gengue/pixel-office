@@ -106,8 +106,8 @@ function avatar(ctx, x, footY, facing, frame) {
     const row = facing === 'back' ? 2 : facing === 'front' ? 0 : 1
     const sideWalk = moving && row === 1
     const index = sitting ? 13 : moving ? row * 4 + frame : facing === 'back' ? 15 : facing === 'front' ? 12 : 14
-    // Eight side poses share the original cycle duration; odd poses are in-betweens.
-    const crop = sideWalk ? sideCells[Math.floor(state.distance / 5) % 8] : cells[index]
+    // Keep the newer contact/passing art, using the approved four-pose vertical beat.
+    const crop = sideWalk ? sideCells[frame * 2] : cells[index]
     const scale = 68 / (sideWalk ? sideCells[0][3] : cells[12][3])
     const width = crop[2] * scale, height = crop[3] * scale
     ctx.save()

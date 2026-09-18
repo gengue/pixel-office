@@ -95,3 +95,9 @@ Visual evidence: `/tmp/avatar-eight-review.png` shows front, all eight side pose
 Earlier reports describe rejected iterations; this entry supersedes their current-state claims. Final subjective acceptance remains with the user reviewing the moving prototype.
 
 final result: passed
+
+## Final pacing simplification
+
+The user prefers the newer artwork but finds the eight-pose lateral playback too busy/fast relative to the approved vertical walk. Kept the newer atlas and selected only contact/passing poses 0, 2, 4 and 6. Side rendering now consumes the same four-pose `frame` value as front/back; removed the additional intermediate beats. No art regeneration or vertical movement change.
+
+The browser regression failed before this adjustment because lateral frames changed twice as often. Afterward every direction has exactly four distinct poses and identical frame-change timestamps: eight changes per second at normal speed, twelve at 150%. Full cycle duration remains equal. Build, browser interaction checks and diff check passed. Latest screenshot: `/tmp/avatar-side-smooth.png`. This entry supersedes the previous eight-pose playback description; all eight source poses remain in the asset, but only four are played.
