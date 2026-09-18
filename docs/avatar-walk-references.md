@@ -46,3 +46,9 @@ Research date: 2026-09-18. Scope: reference research before another implementati
 5. Compare both side directions against front/back at the same travel speed, on a floor with visible markers, at native size and enlarged. Check the contact/passing silhouettes and the loop boundary before subjective approval of the moving result.
 
 The references establish a workflow and visual targets; they do not prove that a proposed implementation looks natural. The parent investigation supplies local code measurements and runtime review. This document intentionally contains no new numeric rig prescription or claim that the defect is fixed.
+
+## User-supplied eight-frame guide (latest direction)
+
+The user supplied `image.png`, “141 — Human Female Walk Cycle / Side View Dummy” (Slynyrd), showing 4/6/8-frame comparisons and eight sequential contact/down/passing/up poses. This supplied image is the direct motion target; no external video of it was reviewed. The user rejected the prior four-frame lateral interpretation and requested more intermediates and consistency with the approved vertical movement.
+
+The revised approach uses eight complete side poses across the same cycle duration as the unchanged four-pose front/back views. This preserves step cadence while doubling pose sampling. Asset review rejected sheets with repeated contact poses, frozen arms, overlapping sprite gutters and mismatched body proportions. Subsequent revisions corrected pre-contact foot clearance, the second-half arm phase and compact character proportions before use. Eight distinct images and correct timing alone still do not establish subjective naturalness; compare the running preview to the supplied pose progression.

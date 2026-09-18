@@ -63,25 +63,33 @@ try {
       await motion.getByText('Listo para probar.', { exact:true }).waitFor()
       await motion.locator('#direction').selectOption(direction)
       await motion.locator('#speed').fill(String(speed))
-      const result = await motion.evaluate(() => {
+      const result = await motion.evaluate(speed => {
         const canvas = document.querySelector('#detail')
         let time = 0
         for (let i = 0; i < 90; i++) window.advanceAvatarFrame(time += 1000 / 60)
         let previous = canvas.toDataURL()
+        const first = previous
+        let cycleMatches = false
         const changes = [], poses = new Set([previous])
         for (let i = 0; i < 60; i++) {
           window.advanceAvatarFrame(time += 1000 / 60)
           const current = canvas.toDataURL()
+          if (i === Math.round(30 * 100 / speed) - 1) cycleMatches = current === first
           if (current !== previous) changes.push(i)
           poses.add(current)
           previous = current
         }
-        return { changes, poses:poses.size }
-      })
+        return { changes, poses:poses.size, cycleMatches }
+      }, speed)
       approvedTiming ??= result.changes
-      assert.deepEqual(result.changes, approvedTiming, `${direction}: frame changes must match approved front pacing`)
-      assert.equal(result.poses, 4, `${direction}: four whole-body poses must repeat without deformation`)
-      console.log(`${direction} ${speed}%: ${result.poses} poses, ${result.changes.length} changes/second; timing matches front`)
+      const lateral = direction === 'right' || direction === 'left'
+      assert(result.cycleMatches, `${direction}: cycle duration must match the approved front/back walk`)
+      if (lateral) {
+        assert(approvedTiming.every(frame => result.changes.includes(frame)), `${direction}: intermediate poses must preserve shared beat boundaries`)
+        assert.equal(result.changes.length, approvedTiming.length * 2, `${direction}: one added in-between per original pose`)
+      } else assert.deepEqual(result.changes, approvedTiming, `${direction}: approved vertical timing must stay unchanged`)
+      assert.equal(result.poses, lateral ? 8 : 4, `${direction}: complete, distinct poses must repeat without deformation`)
+      console.log(`${direction} ${speed}%: ${result.poses} poses, ${result.changes.length} changes/second; full-cycle timing matches front`)
     }
   }
   await motion.screenshot({ path:'/tmp/avatar-side-smooth.png', fullPage:true })

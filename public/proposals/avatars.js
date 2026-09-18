@@ -53,7 +53,7 @@ $('camera').onclick = async () => {
 }
 addEventListener('pagehide', stopCamera)
 
-function measureCells(image, columns, rows, target) {
+function measureCells(image, columns, rows, target, columnEdges) {
   // Measure each transparent cell once; keep source proportions and a shared scale.
   const sample = document.createElement('canvas')
   sample.width = image.width; sample.height = image.height
@@ -61,8 +61,8 @@ function measureCells(image, columns, rows, target) {
   context.drawImage(image, 0, 0)
   const { data } = context.getImageData(0, 0, image.width, image.height)
   for (let row = 0; row < rows; row++) for (let col = 0; col < columns; col++) {
-    const sx = Math.floor(col * image.width / columns), sy = Math.floor(row * image.height / rows)
-    const w = Math.floor((col + 1) * image.width / columns) - sx, h = Math.floor((row + 1) * image.height / rows) - sy
+    const sx = Math.floor((columnEdges?.[col] ?? col / columns) * image.width), sy = Math.floor(row * image.height / rows)
+    const w = Math.floor((columnEdges?.[col + 1] ?? (col + 1) / columns) * image.width) - sx, h = Math.floor((row + 1) * image.height / rows) - sy
     let left = w, top = h, right = 0, bottom = 0
     for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
       if (data[((sy + y) * image.width + sx + x) * 4 + 3] < 32) continue
@@ -82,10 +82,11 @@ function measureCells(image, columns, rows, target) {
   if (loaded) $('status').textContent = 'Listo para probar.'
 }
 atlas.onload = () => measureCells(atlas, 4, 4, cells)
-sideAtlas.onload = () => measureCells(sideAtlas, 2, 2, sideCells)
+// Measured gutters keep extended boots inside their complete pose.
+sideAtlas.onload = () => measureCells(sideAtlas, 4, 2, sideCells, [0, .27, .52, .755, 1])
 atlas.onerror = sideAtlas.onerror = reference.onerror = () => { $('status').textContent = 'No se pudieron cargar las imágenes. Recarga la página.' }
 atlas.src = './avatar-atlas.png'
-sideAtlas.src = './avatar-side-walk.png'
+sideAtlas.src = './avatar-side-walk-eight.png'
 reference.src = './avatar-reference.png'
 
 function avatar(ctx, x, footY, facing, frame) {
@@ -105,8 +106,9 @@ function avatar(ctx, x, footY, facing, frame) {
     const row = facing === 'back' ? 2 : facing === 'front' ? 0 : 1
     const sideWalk = moving && row === 1
     const index = sitting ? 13 : moving ? row * 4 + frame : facing === 'back' ? 15 : facing === 'front' ? 12 : 14
-    const crop = sideWalk ? sideCells[frame] : cells[index]
-    const scale = 68 / (sideWalk ? crop[3] : cells[12][3])
+    // Eight side poses share the original cycle duration; odd poses are in-betweens.
+    const crop = sideWalk ? sideCells[Math.floor(state.distance / 5) % 8] : cells[index]
+    const scale = 68 / (sideWalk ? sideCells[0][3] : cells[12][3])
     const width = crop[2] * scale, height = crop[3] * scale
     ctx.save()
     // The front/back contacts share a leading leg; mirror the second half-cycle.

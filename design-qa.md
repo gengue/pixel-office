@@ -81,3 +81,17 @@ The shared `frame` now drives every direction. Browser verification compares act
 Visual evidence: `/tmp/avatar-matched-poses.png` places front, side and back cycles together (four poses per row, identical drawing scale). Inspected extended support legs, lifted passing feet, collar alignment, outfit palette and complete silhouettes, with no segmented knees. Native scene and enlarged detail were both checked. This is visual QA evidence, not a claim of subjective user approval; the moving preview remains available for review.
 
 final result: passed
+
+## Eight-pose reference correction (latest implementation)
+
+Direct source: user attachment `image.png`, Slynyrd's “141 — Human Female Walk Cycle / Side View Dummy”, inspected in full. The user rejected the preceding four-pose result. Runtime now uses `avatar-side-walk-eight.png`: eight side poses with contact, recoil, passing and pre-contact phases on both halves. Intermediate pose sampling is doubled while the full cycle remains 40 world pixels; front/back art and timing are unchanged. Removed the superseded four-pose side atlas.
+
+Asset checks rejected initial eight-image sheets that still duplicated contact poses or froze the arms. The selected revised asset includes pre-contact clearance and corrected rearward arm placement in frame six, with more compact proportions matching the front/back character. Sprite gutters are measured so extended boots do not leak into adjacent crops. A single body scale is shared across the side frames rather than resizing each pose independently, preserving the small source height changes. The collar remains the horizontal anchor.
+
+Fresh browser checks: front/back each show four distinct poses at 8 changes/second; left/right each show eight at 16 changes/second. At 150% speed those rates are 12 and 24. The original beat boundaries and full-cycle return match in all four directions. Camera, pause, seated pose, comparison, mobile overflow, reduced motion and browser-error checks passed. Build and diff checks passed.
+
+Visual evidence: `/tmp/avatar-eight-review.png` shows front, all eight side poses and back at identical rendering scale. Inspected against the supplied reference for support extension, returning foot clearance, alternating arm direction, compact proportions, complete boot crops and loop progression. Actual browser recording is under `/tmp/avatar-eight-video/`. The optional `watch-skill loop` automated critique could not run because its Python environment lacks Playwright; the existing Node Playwright browser captured the sequence instead. No claim of automated naturalness approval is made.
+
+Earlier reports describe rejected iterations; this entry supersedes their current-state claims. Final subjective acceptance remains with the user reviewing the moving prototype.
+
+final result: passed
