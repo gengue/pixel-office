@@ -57,3 +57,19 @@ test('only a dancing ghost headbangs, with a fixed collar and static reduced mot
   expect(calls[2][2]).toBeCloseTo(.89)
   expect(calls[3]).toEqual(['translate', -50, -96])
 })
+
+
+test('orc outfit colors change the purple tabard without tinting skin or leather', () => {
+  const previous = globalThis.document
+  const pixels = new Uint8ClampedArray([100, 130, 80, 255, 150, 80, 210, 255, 110, 80, 50, 255])
+  globalThis.document = { createElement:() => ({ getContext:() => ({ drawImage() {}, getImageData:() => ({ data:pixels }), putImageData() {} }) }) }
+  try {
+    coloredImage({ src:'orc-material-regression', width:3, height:1 }, '#568fae', 'orco')
+    expect([...pixels.slice(0, 4)]).toEqual([100, 130, 80, 255])
+    expect([...pixels.slice(4, 8)]).not.toEqual([150, 80, 210, 255])
+    expect([...pixels.slice(8, 12)]).toEqual([110, 80, 50, 255])
+  } finally {
+    if (previous === undefined) delete globalThis.document
+    else globalThis.document = previous
+  }
+})

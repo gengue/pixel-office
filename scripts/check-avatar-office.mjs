@@ -7,10 +7,13 @@ try {
  const ctx=await browser.newContext({permissions:['camera','microphone'],viewport:{width:1400,height:1000},recordVideo:{dir:'/tmp/human-office-video',size:{width:1400,height:1000}}})
  await ctx.addInitScript(() => {
    const draw = CanvasRenderingContext2D.prototype.drawImage
+   const sources = new WeakMap()
    window.danceDraws = 0
    window.headTilts = 0
    CanvasRenderingContext2D.prototype.drawImage = function(source, ...args) {
-     if (this.canvas.id === 'map' && (source.width === 1122 && source.height < 400 || source.width === 2172 && source.height === 724)) window.danceDraws++
+     const asset = source.src || sources.get(source) || ''
+     if (this.canvas.id !== 'map' && asset) sources.set(this.canvas, asset)
+     if (this.canvas.id === 'map' && (/avatar-dance|metal-dance/.test(asset) || /(?:mujer|orco)-atlas/.test(asset) && args[1] > source.height * .78)) window.danceDraws++
      if (this.canvas.id === 'map' && source instanceof HTMLVideoElement && Math.abs(this.getTransform().b) > .05) window.headTilts++
      return draw.call(this, source, ...args)
    }
@@ -23,6 +26,7 @@ try {
  const hash=()=>a.locator('[data-kind="hombre"] canvas').evaluate(c=>c.toDataURL())
  const green=await hash()
  await a.locator('[data-color="ocean"]').click();assert.notEqual(await hash(),green)
+ assert((await a.locator('[data-kind="mujer"] canvas').evaluate(c=>c.toDataURL())) !== await hash(),'Woman must have a distinct body even with the same outfit color')
  await a.locator('#accessory').selectOption('scarf');assert.notEqual(await hash(),green)
  await a.locator('[data-color="original"]').click();await a.locator('#accessory').selectOption('none')
  const man=await hash(),woman=await a.locator('[data-kind="mujer"] canvas').evaluate(c=>c.toDataURL())

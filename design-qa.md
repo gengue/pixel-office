@@ -131,3 +131,14 @@ The ghost now has a separate four-pose atlas with rock hand gestures, hunched sh
 
 Reviewed the actual prototype recording under `/tmp/ghost-metal-video/` and its eight-frame motion strip `/tmp/ghost-metal-motion.png`: the face stays attached, all four silhouettes are complete, and robe/head movement is visible at office scale. Used the existing Node Playwright recorder because the Watch Skill loop command reports its missing Python Playwright dependency. Atlas gutters are measured to avoid clipping raised fingers. Focused dance browser checks and 29 Bun tests (7,378 assertions in an isolated source copy) pass.
 The full office browser check also passes, including local/remote webcam head rotation and stopping headbanging under reduced motion. Prototype controls, all six walking cycles, and existing character colors/accessories pass without page errors. Production build passes.
+
+
+## Distinct woman and fantasy orc
+
+The user reported identical human bodies when both use Ocean and an orc wearing modern clothing. Woman now has her own atlas: fitted dress, cream blouse sleeves, belt, leggings and ankle boots. Orc now has a broad muscular green body, leather harness/bracers, iron shoulder armor, a purple tabard and medieval boots. Recoloring changes the orc cloth without tinting green skin or leather. The webcam face is unchanged. This supersedes the earlier shared-human-body design.
+
+Both have their own front/back, idle, seated and dance poses. Lateral sheets preserve reciprocal arm swing; rejected repeated-arm and three-quarter iterations. Explicit atlas gutters prevent adjacent fists or boots entering another pose. Collar anchors accommodate shoulder armor and raised hands. Four played poses retain the existing eight vertical and seven lateral changes per second.
+
+Evidence: `/tmp/redesign-lobby.png` shows all characters with Ocean selected; `/tmp/redesign-poses.png` shows all 20 rendered poses of each changed character. Recorded the running prototype at normal speed in `/tmp/redesign-motion-video/`, inspected `/tmp/redesign-woman-walk.png` and `/tmp/redesign-orc-walk.png`, and checked actual office captures from the multiplayer browser test. Bodies remain distinct at lobby scale and the face stays attached throughout walking and dancing.
+
+The same-color woman regression and orc skin-preservation regression both failed before the fix and pass now. All three browser scripts pass: preview controls, all six characters, local/remote movement and dancing, seated precedence, colors/accessories, webcam, mobile and reduced motion. Thirty Bun tests pass with 7,381 assertions in an isolated source copy; the existing local admin credential remains untouched. Production build and diff checks pass. Independent code review found no actionable issues.

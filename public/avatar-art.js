@@ -1,8 +1,8 @@
 // Shared artwork for the lobby, office and prototype; safe to import on the server.
-const artwork = Object.fromEntries(['human', 'orco', 'lagarto', 'robot', 'fantasma'].map(kind => [kind, { cells:[], sideCells:[], danceCells:[] }]))
+const artwork = Object.fromEntries(['human', 'mujer', 'orco', 'lagarto', 'robot', 'fantasma'].map(kind => [kind, { cells:[], sideCells:[], danceCells:[] }]))
 const tinted = new Map()
 let danceLoading
-const artKind = kind => kind === 'hombre' || kind === 'mujer' ? 'human' : kind
+const artKind = kind => kind === 'hombre' ? 'human' : kind
 
 export const walkFrame = (walk, direction) => Math.floor(walk * (direction === 'left' || direction === 'right' ? .7 : .8)) % 4
 export function transformDanceHead(ctx, kind, dancing, sitting, time, x, y) {
@@ -20,7 +20,7 @@ export function movementDirection(dx, dy, previous = 'front') {
   return Math.abs(dx) > Math.abs(dy) ? dx < 0 ? 'left' : 'right' : dy < 0 ? 'back' : 'front'
 }
 
-function measureCells(image, columns, rows, target, columnEdges, raisedArms = false) {
+function measureCells(image, columns, rows, target, columnEdges, raisedArms = false, rowEdges) {
   // Measure each transparent cell once; keep source proportions and a shared scale.
   const sample = document.createElement('canvas')
   sample.width = image.width; sample.height = image.height
@@ -28,8 +28,8 @@ function measureCells(image, columns, rows, target, columnEdges, raisedArms = fa
   context.drawImage(image, 0, 0)
   const { data } = context.getImageData(0, 0, image.width, image.height)
   for (let row = 0; row < rows; row++) for (let col = 0; col < columns; col++) {
-    const sx = Math.floor((columnEdges?.[col] ?? col / columns) * image.width), sy = Math.floor(row * image.height / rows)
-    const w = Math.floor((columnEdges?.[col + 1] ?? (col + 1) / columns) * image.width) - sx, h = Math.floor((row + 1) * image.height / rows) - sy
+    const sx = Math.floor((columnEdges?.[col] ?? col / columns) * image.width), sy = Math.floor(rowEdges?.[row] ?? row * image.height / rows)
+    const w = Math.floor((columnEdges?.[col + 1] ?? (col + 1) / columns) * image.width) - sx, h = Math.floor(rowEdges?.[row + 1] ?? (row + 1) * image.height / rows) - sy
     let left = w, top = h, right = 0, bottom = 0
     for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
       if (data[((sy + y) * image.width + sx + x) * 4 + 3] < 32) continue
@@ -68,14 +68,15 @@ function loadDanceArt() {
       try {
         // Row gutters are measured from the shared five-character dance sheet.
         const edges = [0, 282, 546, 808, 1095, 1402]
-        Object.values(artwork).slice(0, 4).forEach((art, row) => {
+        for (const [kind, row] of [['human', 0], ['lagarto', 2], ['robot', 3]]) {
+          const art = artwork[kind]
           const canvas = document.createElement('canvas')
           canvas.width = image.width; canvas.height = edges[row + 1] - edges[row]
           canvas.src = `${image.src}#${row}`
           canvas.getContext('2d').drawImage(image, 0, edges[row], image.width, canvas.height, 0, 0, image.width, canvas.height)
           measureCells(canvas, 4, 1, art.danceCells, [0, .273, .5, .744, 1], true)
           art.danceAtlas = canvas
-        })
+        }
         resolve(true)
       } catch { resolve(false) }
     }
@@ -89,14 +90,23 @@ export function loadAvatarArt(kind) {
   if (!kind) return Promise.all(Object.keys(artwork).map(loadAvatarArt)).then(results => results.every(Boolean))
   const name = artKind(kind), art = artwork[name]
   if (!art) return Promise.resolve(false)
-  const sources = [[`${name}-atlas.png`, 4, art.cells]]
+  const completeAtlas = name === 'mujer' || name === 'orco'
+  const rowEdges = name === 'mujer' ? [0, 259, 500, 742, 978, 1254] : completeAtlas ? [0, 288, 570, 844, 1105, 1402] : undefined
+  const sources = [[`${name}-atlas.png`, completeAtlas ? 5 : 4, art.cells]]
   if (name === 'fantasma') sources.push(['fantasma-metal-dance.png', 1, art.danceCells, [0, 564 / 2172, 1108 / 2172, 1608 / 2172, 1], true])
-  if (name !== 'fantasma') sources.push([`${name}-side-walk.png`, 2, art.sideCells, [0, .27, .52, .755, 1]])
-  return art.loading ??= Promise.all([loadDanceArt(), ...sources.map(([file, rows, target, edges, raisedArms], index) => new Promise((resolve, reject) => {
+  if (name !== 'fantasma') sources.push([`${name}-side-walk.png`, name === 'mujer' ? 1 : 2, art.sideCells, name === 'mujer' ? [0, 586 / 2172, 1048 / 2172, 1692 / 2172, 1] : [0, .27, .52, .755, 1]])
+  return art.loading ??= Promise.all([completeAtlas || name === 'fantasma' ? true : loadDanceArt(), ...sources.map(([file, rows, target, edges, raisedArms], index) => new Promise((resolve, reject) => {
     const image = new Image()
     if (raisedArms) art.danceAtlas = image; else if (index) art.sideAtlas = image; else art.atlas = image
     image.onload = () => {
-      try { measureCells(image, 4, rows, target, edges, raisedArms); resolve() } catch (error) { reject(error) }
+      try {
+        measureCells(image, 4, rows, target, edges, raisedArms || completeAtlas, rows === 5 ? rowEdges : undefined)
+        if (rows === 5) {
+          art.danceCells.push(...art.cells.splice(16))
+          art.danceAtlas = image
+        }
+        resolve()
+      } catch (error) { reject(error) }
     }
     image.onerror = reject
     image.src = `/assets/${file}`
@@ -115,14 +125,14 @@ export function coloredImage(image, color, kind) {
   const rgb = color.match(/\w\w/g).map(channel => parseInt(channel, 16))
   for (let i = 0; i < pixels.data.length; i += 4) {
     const [r, g, b, alpha] = pixels.data.subarray(i, i + 4)
-    // Recolor the robe or green material while preserving texture and luminance.
-    const material = kind === 'fantasma' ? b > r * 1.05 && r > g * 1.03 : g > r * 1.03 && r > b * 1.1
-    if (!alpha || !material || kind === 'orco' && b < r * .62) continue
+    // Recolor cloth while preserving skin, leather, texture and luminance.
+    const material = kind === 'fantasma' || kind === 'orco' ? b > r * 1.05 && r > g * 1.03 : g > r * 1.03 && r > b * 1.1
+    if (!alpha || !material) continue
     const light = g / 138
     for (let c = 0; c < 3; c++) pixels.data[i + c] = Math.min(255, rgb[c] * light)
   }
   ctx.putImageData(pixels, 0, 0)
-  // The fixed assets and five outfit colors bound this cache to 70 entries.
+  // The fixed assets and five outfit colors bound this cache to 75 entries.
   tinted.set(key, canvas)
   return canvas
 }
@@ -131,7 +141,7 @@ export function drawAvatarBody(ctx, px, py, scale, walk, sitting, options = {}) 
   const kind = options.kind ?? 'hombre'
   loadAvatarArt(kind)
   const art = artwork[artKind(kind)]
-  if (!art || art.cells.length !== 16 || artKind(kind) !== 'fantasma' && art.sideCells.length !== 8) return null
+  if (!art || art.cells.length !== 16 || artKind(kind) !== 'fantasma' && ![4, 8].includes(art.sideCells.length)) return null
   const { cells, sideCells, danceCells, atlas, sideAtlas, danceAtlas } = art
   const dancing = options.dancing && !sitting
   if (dancing && danceCells.length !== 4) return null
@@ -140,14 +150,14 @@ export function drawAvatarBody(ctx, px, py, scale, walk, sitting, options = {}) 
   const frame = walkFrame(walk, direction)
   const row = direction === 'back' ? 2 : direction === 'front' ? 0 : 1
   const lateral = moving && row === 1 && sideCells.length > 0
-  const crop = dancing ? danceCells[Math.floor((options.time ?? 0) * 4) % 4] : lateral ? sideCells[frame * 2] : cells[sitting ? 13 : moving ? row * 4 + frame : row === 2 ? 15 : row === 0 ? 12 : 14]
-  const ratio = scale * (dancing ? 16 / (danceCells[0][3] - danceCells[0].neckY) : sitting ? 12 / cells[13][3] : 16 / (lateral ? sideCells[0][3] : cells[12][3]))
+  const crop = dancing ? danceCells[Math.floor((options.time ?? 0) * 4) % 4] : lateral ? sideCells[frame * (sideCells.length / 4)] : cells[sitting ? 13 : moving ? row * 4 + frame : row === 2 ? 15 : row === 0 ? 12 : 14]
+  const ratio = scale * (dancing ? 16 / (danceCells[0][3] - danceCells[0].neckY) : sitting ? 12 / (cells[13][3] - (cells[13].neckY ?? 0)) : 16 / (lateral ? sideCells[0][3] - (sideCells[0].neckY ?? 0) : cells[12][3] - (cells[12].neckY ?? 0)))
   const width = crop[2] * ratio, height = crop[3] * ratio
-  const neckY = dancing ? crop.neckY * ratio : 0
+  const neckY = (crop.neckY ?? 0) * ratio
   const offset = scale * (sitting ? 12 : 16) - height + neckY
   ctx.save()
   ctx.translate(px + 6 * scale, py + offset)
-  if (!sitting && (direction === 'left' || moving && row !== 1 && frame >= 2)) ctx.scale(-1, 1)
+  if (!sitting && (direction === 'left' || moving && row !== 1 && frame >= 2 && kind !== 'mujer' && kind !== 'orco')) ctx.scale(-1, 1)
   ctx.imageSmoothingEnabled = false
   ctx.drawImage(coloredImage(dancing ? danceAtlas : lateral ? sideAtlas : atlas, options.color, kind), ...crop, -crop.neckX * ratio, -neckY, width, height)
   ctx.restore()
