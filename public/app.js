@@ -1,3 +1,4 @@
+import { createMediaInputs, mediaError } from './media-devices.js'
 import { loadAvatarArt, movementDirection, transformDanceHead } from './avatar-art.js'
 import { drawTeleport } from './teleport.js'
 import { pathToPerson } from './navigation.js'
@@ -139,6 +140,91 @@ const whiteboard = setupWhiteboard({
   stopMoving() { keys.clear(); cancelVisit(); me.tx = me.ty = null; stopDancing() },
 })
 let muted = savedMedia.muted, cameraOff = savedMedia.cameraOff
+const devicesDialog = $('devicesDialog')
+let devicesBusy = false
+const inputs = createMediaInputs({
+  mediaDevices:navigator.mediaDevices, storage:localStorage,
+  enabled:kind => kind === 'audio' ? !muted : !cameraOff,
+  onStream(stream) {
+    localStream = stream
+    updateMediaControls()
+    for (const id of ['selfVideo', 'devicePreview']) {
+      $(id).srcObject = stream
+      if (stream) $(id).play().catch(() => {})
+    }
+  },
+  async replaceTrack(track) {
+    const senders = [...pcs.values()].flatMap(pc => pc.getSenders().filter(sender => sender.track?.kind === track.kind))
+    const previous = senders.map(sender => sender.track)
+    const results = await Promise.allSettled(senders.map(sender => sender.replaceTrack(track)))
+    if (results.some(result => result.status === 'rejected')) {
+      await Promise.allSettled(senders.map((sender, index) => sender.replaceTrack(previous[index])))
+      throw new Error('Could not switch the call input.')
+    }
+  },
+  onEnded(kind) {
+    $('devicesBtn').textContent = 'Check devices'
+    $('devicesStatus').textContent = `${kind === 'video' ? 'Camera' : 'Microphone'} disconnected. Choose another device.`
+    void refreshDevices()
+  },
+})
+
+async function refreshDevices() {
+  if (!devicesDialog.open || devicesBusy) return
+  try {
+    const devices = await navigator.mediaDevices.enumerateDevices()
+    for (const [kind, id] of [['video', 'cameraInput'], ['audio', 'microphoneInput']]) {
+      const select = $(id), selected = inputs.preferences[kind]
+      const list = devices.filter(device => device.kind === `${kind}input` && device.deviceId)
+      select.replaceChildren(new Option('System default', ''))
+      for (const [index, device] of list.entries()) select.add(new Option(device.label || `${kind === 'video' ? 'Camera' : 'Microphone'} ${index + 1}`, device.deviceId))
+      if (selected && !list.some(device => device.deviceId === selected)) {
+        const missing = new Option('Disconnected device', selected)
+        missing.disabled = true
+        select.add(missing)
+      }
+      select.value = selected
+      select.disabled = !list.length
+    }
+  } catch { $('devicesStatus').textContent = 'Could not list devices. Close this panel and try again.' }
+}
+
+async function configureInput(kind, id) {
+  if (devicesBusy) return
+  devicesBusy = true
+  $('cameraInput').disabled = $('microphoneInput').disabled = true
+  $('devicesRetry').hidden = true
+  $('devicesStatus').textContent = kind ? 'Switching device…' : 'Allow camera and microphone to preview your devices…'
+  try {
+    if (kind) await inputs.select(kind, id)
+    else await inputs.ensure()
+    $('devicesBtn').textContent = 'Devices'
+    $('devicesStatus').textContent = `${muted ? 'Microphone off. ' : ''}${cameraOff ? 'Camera off. ' : ''}Ready. Device choices save automatically.`
+  } catch (error) {
+    if (devicesDialog.open) {
+      $('devicesStatus').textContent = mediaError(error)
+      $('devicesRetry').hidden = false
+    }
+  } finally {
+    devicesBusy = false
+    await refreshDevices()
+  }
+}
+function openDevices() {
+  keys.clear(); cancelVisit(); me.tx = me.ty = null
+  devicesDialog.showModal()
+  void configureInput()
+}
+$('lobbyDevices').onclick = $('devicesBtn').onclick = openDevices
+$('devicesClose').onclick = () => devicesDialog.close()
+$('devicesRetry').onclick = () => void configureInput()
+$('cameraInput').onchange = event => void configureInput('video', event.target.value)
+$('microphoneInput').onchange = event => void configureInput('audio', event.target.value)
+devicesDialog.addEventListener('close', () => {
+  if (!hasEntered && !$('joinBtn').disabled) inputs.stop()
+})
+navigator.mediaDevices?.addEventListener('devicechange', () => void refreshDevices())
+
 const bubbles = new Map() // bubbleId -> {el, pid, until}
 
 const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y)
@@ -754,30 +840,13 @@ async function joinOffice() {
     const name = $('name').value.trim() || `user${Math.floor(Math.random() * 999)}`
     Object.assign(me, { name: name.slice(0, 24), body: picked, appearance: normalizeAppearance(appearance), x: 70 + Math.random() * 100, y: 330 + Math.random() * 60 })
   }
-  // camera + mic required: no head or voice without them, no entry
-  if (!localStream) {
-    setStatus('asking for camera and microphone…', true)
-    try {
-      localStream = await navigator.mediaDevices.getUserMedia({
-        video: { width: { ideal: 320 }, height: { ideal: 240 } },
-        audio: { echoCancellation: true, noiseSuppression: true },
-      })
-      updateMediaControls()
-      $('selfVideo').srcObject = localStream
-      // never hang on play(): some browsers stall it, video starts when it can
-      await Promise.race([$('selfVideo').play().catch(() => {}), new Promise((r) => setTimeout(r, 4000))])
-    } catch (e) {
-      const denied = e?.name === 'NotAllowedError' || e?.name === 'SecurityError'
-      const missing = e?.name === 'NotFoundError' || e?.name === 'OverconstrainedError'
-      failJoin(
-        denied
-          ? 'Permission denied: allow camera and microphone in the browser (lock icon in the address bar) and try again.'
-          : missing
-            ? 'No camera or microphone found. Plug in a device and try again.'
-            : 'Could not start camera/microphone. Check the browser and try again.'
-      )
-      return
-    }
+  // Camera and microphone are required; reuse the chosen inputs from the preview.
+  setStatus('asking for camera and microphone…', true)
+  try {
+    await inputs.ensure()
+  } catch (error) {
+    failJoin(mediaError(error))
+    return
   }
   updateMediaControls()
   saveMediaPreferences(localStorage, muted, cameraOff)
@@ -810,6 +879,7 @@ addEventListener('beforeunload', () => {
   clearTimeout(reconnectTimer)
   clearTimeout(joinTimer)
   screenShare.reset()
+  inputs.stop()
   try {
     ws?.close()
   } catch {}

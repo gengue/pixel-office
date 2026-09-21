@@ -197,3 +197,15 @@ are not arbitrated by the server. Camera capture targets 320×240 to limit bandw
 Click a person in **People** to walk quickly beside them, following a free route around walls and furniture. Select them again, press Esc, or move manually to cancel. Full rooms remain inaccessible.
 
 Successful meeting-link arrivals play a brief cyan teleport portal, beam, and particle effect for the arriving person and connected peers. Reduced-motion mode uses a short static halo.
+
+### Camera and microphone selection
+
+Open **Camera & microphone** before entering, or **Devices** in the office, to preview and choose inputs. Choices are remembered in this browser. Switching preserves microphone/camera mute states and updates ongoing calls.
+
+Browser regression check (Chromium and Playwright required):
+
+```sh
+PLAYWRIGHT_MODULE=/path/to/playwright/index.mjs OFFICE_URL=https://your-preview node scripts/check-media-devices.mjs
+```
+
+The check uses virtual camera/microphone choices with real browser media tracks and a second WebRTC participant; it covers persistence, failed capture, preview cleanup, muted switching and mobile layout.
