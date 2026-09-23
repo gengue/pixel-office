@@ -9,7 +9,7 @@ export function createMediaInputs({ mediaDevices, storage, enabled, onStream, re
   let preferences = {}, stream = null, pending = null, generation = 0
   try { preferences = JSON.parse(storage.getItem('po-inputs') || '{}') || {} } catch {}
   preferences = Object.fromEntries(['audio', 'video'].map(kind => [kind, typeof preferences[kind] === 'string' ? preferences[kind] : '']))
-  const constraint = (kind, id, exact) => ({ ...defaults[kind], ...(id ? { deviceId:{ [exact ? 'exact' : 'ideal']:id } } : {}) })
+  const constraint = (kind, id) => ({ ...defaults[kind], ...(id ? { deviceId:{ exact:id } } : {}) })
   const stopTracks = value => value?.getTracks().forEach(track => track.stop())
 
   function capture(constraints, requested) {
@@ -48,7 +48,7 @@ export function createMediaInputs({ mediaDevices, storage, enabled, onStream, re
       if (version !== generation) throw new DOMException('Capture cancelled.', 'AbortError')
       for (const track of tracks) {
         const wanted = requested[track.kind]
-        preferences[track.kind] = wanted ? track.getSettings().deviceId || wanted : ''
+        preferences[track.kind] = wanted || ''
         track.addEventListener('ended', () => {
           if (stream?.getTracks().includes(track)) onEnded(track.kind)
         })
@@ -66,16 +66,16 @@ export function createMediaInputs({ mediaDevices, storage, enabled, onStream, re
     async ensure() {
       if (pending) { try { await pending } catch {} }
       if (['audio', 'video'].every(kind => stream?.getTracks().some(track => track.kind === kind && track.readyState === 'live'))) return stream
-      return capture(Object.fromEntries(['audio', 'video'].map(kind => [kind, constraint(kind, preferences[kind], false)])), preferences)
+      return capture(Object.fromEntries(['audio', 'video'].map(kind => [kind, constraint(kind, preferences[kind])])), preferences)
     },
     async select(kind, id) {
       if (!['audio', 'video'].includes(kind)) throw new TypeError('Unknown input kind.')
       if (pending) await pending
       if (!stream || !['audio', 'video'].every(type => stream.getTracks().some(track => track.kind === type && track.readyState === 'live'))) {
         const requested = { ...preferences, [kind]:id }
-        return capture(Object.fromEntries(['audio', 'video'].map(type => [type, constraint(type, requested[type], type === kind)])), requested)
+        return capture(Object.fromEntries(['audio', 'video'].map(type => [type, constraint(type, requested[type])])), requested)
       }
-      return capture({ audio:false, video:false, [kind]:constraint(kind, id, true) }, { [kind]:id })
+      return capture({ audio:false, video:false, [kind]:constraint(kind, id) }, { [kind]:id })
     },
     stop() {
       generation++

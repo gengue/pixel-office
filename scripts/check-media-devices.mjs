@@ -20,7 +20,7 @@ try {
       const stream = await original(clean)
       for (const track of stream.getTracks()) {
         const setting = track.getSettings.bind(track), choice = constraints[track.kind]?.deviceId
-        const id = choice?.exact || choice?.ideal || track.kind+'1'
+        const id = choice?.exact || track.kind+'1'
         track.getSettings = () => ({...setting(),deviceId:id})
         window.captured.push(track)
       }
@@ -44,9 +44,12 @@ try {
   assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth))
   await page.keyboard.press('Escape')
   await page.waitForFunction(() => window.captured.every(track => track.readyState === 'ended'))
+  await page.reload()
   await page.locator('#lobbyDevices').click()
   await page.waitForFunction(() => !document.querySelector('#cameraInput').disabled)
   assert.equal(await page.locator('#cameraInput').inputValue(),'video2')
+  assert.equal(await page.locator('#microphoneInput').inputValue(),'audio2')
+  assert.equal(await page.evaluate(() => document.querySelector('#devicePreview').srcObject.getVideoTracks()[0].getSettings().deviceId),'video2')
   await page.locator('#devicesClose').click()
   await page.locator('#name').fill('Device test')
   await page.locator('#joinBtn').click()

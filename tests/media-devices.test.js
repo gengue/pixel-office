@@ -45,22 +45,22 @@ test('input selection preserves mute, replaces only its kind, and releases the o
   expect(next.readyState).toBe('ended')
 })
 
-test('failed device capture retains the current input and saved choice; missing saved devices use browser fallback', async () => {
-  const mic = new Track('audio', 'mic-1'), camera = new Track('video', 'cam-default')
-  const preferences = storage('{"video":"unplugged","audio":"mic-1"}')
+test('restoring inputs requires the saved devices; failed capture retains the current input and saved choice', async () => {
+  const mic = new Track('audio', 'mic-1'), camera = new Track('video', 'saved-camera')
+  const preferences = storage('{"video":"saved-camera","audio":"mic-1"}')
   let current, request, fail = false
   const inputs = createMediaInputs({
     mediaDevices:{ async getUserMedia(c) { request = c; if (fail) throw new DOMException('Busy', 'NotReadableError'); return streamOf(mic, camera) } },
     storage:preferences, enabled:() => true, onStream:s => current = s, replaceTrack:async () => {}, onEnded() {},
   })
   await inputs.ensure()
-  expect(request.video.deviceId).toEqual({ ideal:'unplugged' })
-  expect(inputs.preferences).toEqual({ audio:'mic-1', video:'cam-default' })
+  expect(request.video.deviceId).toEqual({ exact:'saved-camera' })
+  expect(inputs.preferences).toEqual({ audio:'mic-1', video:'saved-camera' })
   fail = true
   await expect(inputs.select('video', 'busy-camera')).rejects.toThrow('Busy')
   expect(current.getTracks()).toEqual([mic, camera])
   expect(camera.readyState).toBe('live')
-  expect(inputs.preferences.video).toBe('cam-default')
+  expect(inputs.preferences.video).toBe('saved-camera')
 })
 
 test('closing a preview cancels pending capture without leaking devices or remembering an unconfirmed choice', async () => {
@@ -138,4 +138,33 @@ test('partial two-input replacement rolls back every sender before releasing new
   expect(audio.readyState).toBe('live')
   expect(nextAudio.readyState).toBe('ended')
   expect(nextVideo.readyState).toBe('ended')
+})
+
+
+test('reload restores the explicit camera even when the browser prefers a different one', async () => {
+  const saved = storage('{"video":"chosen-camera","audio":"chosen-mic"}')
+  for (let reload = 0; reload < 2; reload++) {
+    let current
+    const inputs = createMediaInputs({
+      storage:saved, enabled:() => true, onStream:value => current = value, onEnded() {}, replaceTrack:async () => {},
+      mediaDevices:{ getUserMedia:async constraints => streamOf(
+        new Track('audio', constraints.audio.deviceId?.exact || 'default-mic'),
+        new Track('video', constraints.video.deviceId?.exact || 'default-camera'),
+      ) },
+    })
+    await inputs.ensure()
+    expect(current.getTracks().map(track => track.id)).toEqual(['chosen-mic', 'chosen-camera'])
+    inputs.stop()
+  }
+})
+
+
+test('an unavailable saved camera is not replaced in storage during reload', async () => {
+  const saved = storage('{"video":"unplugged","audio":"mic"}')
+  const inputs = createMediaInputs({
+    storage:saved, enabled:() => true, onStream() {}, onEnded() {}, replaceTrack:async () => {},
+    mediaDevices:{ getUserMedia:async () => { throw new DOMException('Unavailable', 'OverconstrainedError') } },
+  })
+  await expect(inputs.ensure()).rejects.toThrow('Unavailable')
+  expect(JSON.parse(saved.getItem())).toEqual({video:'unplugged',audio:'mic'})
 })
